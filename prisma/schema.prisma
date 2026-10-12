@@ -1,0 +1,100 @@
+// FitCheck AI database schema.
+// Connection URLs live in prisma7.config.ts (CLI/migrations) and src/lib/prisma.ts (runtime).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Category {
+  TOPS
+  BOTTOMS
+  SHOES
+  OUTERWEAR
+  ACCESSORIES
+}
+
+enum Season {
+  SUMMER
+  WINTER
+  SPRING
+  AUTUMN
+  ALL_WEATHER
+}
+
+// Profile row for a Supabase Auth user. `id` is the same UUID as auth.users.id,
+// so it is set on sign-up rather than generated here.
+model User {
+  id           String   @id @db.Uuid
+  email        String   @unique
+  name         String?
+  avatarUrl    String?
+  bodyPhotoUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clothingItems ClothingItem[]
+  outfits       Outfit[]
+
+  @@map("users")
+}
+
+model ClothingItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  name           String
+  category       Category
+  color          String?
+  secondaryColor String?
+  season         Season   @default(ALL_WEATHER)
+  style          String?
+  imageUrl       String
+  bgRemovedUrl   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfitItems OutfitItem[]
+
+  @@index([userId, category])
+  @@map("clothing_items")
+}
+
+model Outfit {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  name       String
+  occasion   String?
+  isFavorite Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items OutfitItem[]
+
+  @@index([userId, isFavorite])
+  @@map("outfits")
+}
+
+// Places a ClothingItem on an Outfit's canvas. Positions are relative (0–1) to the
+// canvas size so outfits render the same on any screen.
+model OutfitItem {
+  id             String @id @default(uuid()) @db.Uuid
+  outfitId       String @db.Uuid
+  clothingItemId String @db.Uuid
+  positionX      Float  @default(0.5)
+  positionY      Float  @default(0.5)
+  scale          Float  @default(1)
+  zIndex         Int    @default(0)
+
+  outfit       Outfit       @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  clothingItem ClothingItem @relation(fields: [clothingItemId], references: [id], onDelete: Cascade)
+
+  @@unique([outfitId, clothingItemId])
+  @@index([clothingItemId])
+  @@map("outfit_items")
+}
