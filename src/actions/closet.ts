@@ -5,27 +5,11 @@ import { revalidatePath } from "next/cache";
 import { removeBackground } from "@/lib/ai/background";
 import { analyzeClothing } from "@/lib/ai/vision";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
-import { ACCEPTED_IMAGE_TYPES } from "@/lib/clothing";
 import { prisma } from "@/lib/prisma";
 import { removeImages, uploadImage } from "@/lib/storage";
+import { IMAGE_EXTENSIONS, readImageFile } from "@/lib/uploads";
 import { clothingTagsSchema } from "@/lib/validations/clothing";
 import type { ActionResult, ClothingAnalysis, ClothingItem } from "@/types";
-
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-
-const EXTENSIONS: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
-function getImage(formData: FormData, field: string): File | string {
-  const file = formData.get(field);
-  if (!(file instanceof File) || file.size === 0) return "No image was uploaded";
-  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP image";
-  if (file.size > MAX_IMAGE_BYTES) return "Image must be 8 MB or smaller";
-  return file;
-}
 
 // Step 1 of the upload flow: tag the photo with AI and cut out the background, in parallel.
 // Nothing is stored yet; the user reviews the result before saving.
@@ -34,7 +18,7 @@ export async function analyzeClothingImage(
 ): Promise<ActionResult<ClothingAnalysis>> {
   if (!(await getCurrentUserId())) return { success: false, error: "You must be signed in" };
 
-  const image = getImage(formData, "image");
+  const image = readImageFile(formData, "image");
   if (typeof image === "string") return { success: false, error: image };
 
   const bytes = new Uint8Array(await image.arrayBuffer());
@@ -74,7 +58,7 @@ export async function addClothingItem(
     return { success: false, error: "You must be signed in" };
   }
 
-  const original = getImage(formData, "image");
+  const original = readImageFile(formData, "image");
   if (typeof original === "string") return { success: false, error: original };
 
   const cutout = formData.get("cutout");
@@ -95,7 +79,7 @@ export async function addClothingItem(
   }
 
   const id = crypto.randomUUID();
-  const originalPath = `${user.id}/${id}/original.${EXTENSIONS[original.type]}`;
+  const originalPath = `${user.id}/${id}/original.${IMAGE_EXTENSIONS[original.type]}`;
   const cutoutPath = `${user.id}/${id}/cutout.png`;
   const uploaded: string[] = [];
 

@@ -34,4 +34,20 @@ export const STYLES = [
 
 export type Style = (typeof STYLES)[number];
 
+export const OCCASIONS = [
+  "casual",
+  "work",
+  "date night",
+  "party",
+  "formal",
+  "active",
+  "travel",
+] as const;
+
+export type Occasion = (typeof OCCASIONS)[number];
+
+export function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ImageUp, Loader2, Plus, Sparkles, TriangleAlert } from "lucide-react";
+import { Loader2, Plus, Sparkles, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { addClothingItem, analyzeClothingImage } from "@/actions/closet";
+import { Field, OptionSelect } from "@/components/shared/form-controls";
+import { ImageDropzone } from "@/components/shared/image-dropzone";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,23 +18,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Category, Season } from "@/generated/prisma/browser";
 import {
   ACCEPTED_IMAGE_TYPES,
   CATEGORY_LABELS,
   SEASON_LABELS,
   STYLES,
+  capitalize,
 } from "@/lib/clothing";
 import { dataUrlToFile, prepareImage } from "@/lib/image";
-import { cn } from "@/lib/utils";
 import type { ClothingTags } from "@/types";
 
 type Upload = {
@@ -159,7 +153,13 @@ export function UploadDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {step.kind === "select" && <Dropzone onFile={handleFile} />}
+        {step.kind === "select" && (
+          <ImageDropzone
+            onFile={handleFile}
+            title="Drop a photo here or click to browse"
+            hint="JPEG, PNG or WebP. One item per photo works best."
+          />
+        )}
 
         {step.kind === "analyzing" && (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -271,48 +271,6 @@ export function UploadDialog() {
   );
 }
 
-function Dropzone({ onFile }: { onFile: (file: File) => void }) {
-  const [isDragging, setIsDragging] = useState(false);
-
-  return (
-    <label
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) onFile(file);
-      }}
-      className={cn(
-        "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors",
-        "hover:border-foreground/30 hover:bg-muted/50 has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-        isDragging && "border-foreground/40 bg-muted",
-      )}
-    >
-      <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-        <ImageUp className="size-6 text-muted-foreground" />
-      </div>
-      <div>
-        <p className="font-medium">Drop a photo here or click to browse</p>
-        <p className="text-muted-foreground">JPEG, PNG or WebP. One item per photo works best.</p>
-      </div>
-      <input
-        type="file"
-        accept={ACCEPTED_IMAGE_TYPES.join(",")}
-        className="sr-only"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onFile(file);
-          e.target.value = "";
-        }}
-      />
-    </label>
-  );
-}
 
 function ImagePreview({ src, analyzing = false }: { src: string; analyzing?: boolean }) {
   return (
@@ -325,49 +283,7 @@ function ImagePreview({ src, analyzing = false }: { src: string; analyzing?: boo
   );
 }
 
-function OptionSelect({
-  label,
-  items,
-  value,
-  onChange,
-}: {
-  label: string;
-  items: { value: string; label: string }[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Select items={items} value={value} onValueChange={(next) => next && onChange(next)}>
-      <SelectTrigger className="w-full" aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}
 
 function Notice({ children }: { children: React.ReactNode }) {
   return (
@@ -376,8 +292,4 @@ function Notice({ children }: { children: React.ReactNode }) {
       {children}
     </p>
   );
-}
-
-function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }

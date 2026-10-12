@@ -31,6 +31,16 @@ export type ClothingAnalysis = {
   cutoutDataUrl: string | null;
 };
 
+// One item placed on the outfit canvas (client-side shape of an OutfitItem).
+export type CanvasItem = CanvasTransform & { clothingItemId: string };
+
+// An outfit chosen by the AI stylist, before it's laid out on the canvas.
+export type StylistSuggestion = {
+  itemIds: string[];
+  name: string;
+  reasoning: string;
+};
+
 // Uniform return shape for Server Actions, so forms can render errors without try/catch.
 export type ActionResult<T = void> =
   | { success: true; data: T }

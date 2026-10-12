@@ -1,12 +1,9 @@
 import "server-only";
 
-import { google } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
 
+import { assertAiConfigured, model } from "@/lib/ai/model";
 import { clothingTagsSchema, type ClothingTags } from "@/lib/validations/clothing";
-
-// Any vision-capable AI SDK model works here, e.g. openai("gpt-...") from @ai-sdk/openai.
-const model = google(process.env.GEMINI_MODEL ?? "gemini-flash-latest");
 
 const INSTRUCTIONS = `You are a fashion stylist cataloguing a user's wardrobe.
 Look at the single clothing item or accessory in the photo and describe it.
@@ -17,9 +14,7 @@ export async function analyzeClothing(
   image: Uint8Array,
   mediaType: string,
 ): Promise<ClothingTags> {
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set");
-  }
+  assertAiConfigured();
 
   const { output } = await generateText({
     model,

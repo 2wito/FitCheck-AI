@@ -29,16 +29,19 @@ enum Season {
 // Profile row for a Supabase Auth user. `id` is the same UUID as auth.users.id,
 // so it is set on sign-up rather than generated here.
 model User {
-  id           String   @id @db.Uuid
-  email        String   @unique
-  name         String?
-  avatarUrl    String?
-  bodyPhotoUrl String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @db.Uuid
+  email         String   @unique
+  name          String?
+  avatarUrl     String?
+  // Path in the private "user-photos" bucket, never a public URL: body photos are only
+  // served through short-lived signed URLs.
+  bodyPhotoPath String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   clothingItems ClothingItem[]
   outfits       Outfit[]
+  tryOns        TryOn[]
 
   @@map("users")
 }
@@ -73,8 +76,9 @@ model Outfit {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items OutfitItem[]
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  OutfitItem[]
+  tryOns TryOn[]
 
   @@index([userId, isFavorite])
   @@map("outfits")
@@ -97,4 +101,22 @@ model OutfitItem {
   @@unique([outfitId, clothingItemId])
   @@index([clothingItemId])
   @@map("outfit_items")
+}
+
+// A virtual try-on result the user saved to their favorites. Unsaved results are never
+// stored. The image lives in the private "user-photos" bucket.
+model TryOn {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  // The saved outfit it was generated from; null for unsaved canvas looks or deleted outfits.
+  outfitId  String?  @db.Uuid
+  imagePath String
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfit Outfit? @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([outfitId])
+  @@map("try_ons")
 }
