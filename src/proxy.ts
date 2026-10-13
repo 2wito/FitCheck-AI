@@ -1,12 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { LOGIN_PATH, isProtectedPath, safeNextPath } from "@/lib/auth-routes";
 import { SupabaseConfigError, getSupabaseConfig } from "@/lib/supabase/config";
 
 // Runs before every page request: refreshes the Supabase session cookie, sends signed-out
 // visitors of protected pages to /login, and sends signed-in visitors away from /login.
 export async function proxy(request: NextRequest) {
+  // Demo mode: every route is open and Supabase Auth isn't touched, so a missing or
+  // invalid Supabase config can't take the whole site down.
+  if (!AUTH_ENABLED) {
+    return request.nextUrl.pathname === LOGIN_PATH
+      ? NextResponse.redirect(new URL(safeNextPath(null), request.url))
+      : NextResponse.next();
+  }
+
   let config: ReturnType<typeof getSupabaseConfig>;
   try {
     config = getSupabaseConfig();

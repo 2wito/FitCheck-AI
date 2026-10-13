@@ -2,7 +2,7 @@ import "server-only";
 
 import { generateText, Output } from "ai";
 
-import { assertAiConfigured, model } from "@/lib/ai/model";
+import { withModelFallback } from "@/lib/ai/model";
 import { clothingTagsSchema, type ClothingTags } from "@/lib/validations/clothing";
 
 const INSTRUCTIONS = `You are a fashion stylist cataloguing a user's wardrobe.
@@ -14,21 +14,23 @@ export async function analyzeClothing(
   image: Uint8Array,
   mediaType: string,
 ): Promise<ClothingTags> {
-  assertAiConfigured();
-
-  const { output } = await generateText({
-    model,
-    output: Output.object({ schema: clothingTagsSchema }),
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: INSTRUCTIONS },
-          { type: "file", mediaType, data: image },
-        ],
-      },
-    ],
-  });
+  const { output } = await withModelFallback((model, abortSignal) =>
+    generateText({
+      model,
+      abortSignal,
+      maxRetries: 1,
+      output: Output.object({ schema: clothingTagsSchema }),
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: INSTRUCTIONS },
+            { type: "file", mediaType, data: image },
+          ],
+        },
+      ],
+    }),
+  );
 
   return output;
 }

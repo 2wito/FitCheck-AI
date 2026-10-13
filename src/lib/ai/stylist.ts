@@ -4,7 +4,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 
 import { Category, type Season } from "@/generated/prisma/browser";
-import { assertAiConfigured, model } from "@/lib/ai/model";
+import { withModelFallback } from "@/lib/ai/model";
 import { SEASON_LABELS, type Occasion } from "@/lib/clothing";
 import type { ClothingItem, StylistSuggestion } from "@/types";
 
@@ -46,8 +46,6 @@ export async function generateOutfit({
   occasion: Occasion;
   season: Season | null;
 }): Promise<StylistSuggestion> {
-  assertAiConfigured();
-
   // Short refs instead of UUIDs: fewer tokens, and the enum makes it impossible for the
   // model to return an item that isn't in the closet.
   const refs = items.map((_, index) => `item${index + 1}`);
@@ -66,18 +64,22 @@ Season: ${season ? SEASON_LABELS[season] : "any (not specified)"}
 Closet:
 ${closet}`;
 
-  const { output } = await generateText({
-    model,
-    instructions: INSTRUCTIONS,
-    output: Output.object({
-      schema: z.object({
-        itemRefs: z.array(z.enum(refs as [string, ...string[]])).min(1).max(7),
-        name: z.string().describe("Short catchy outfit name, max 5 words"),
-        reasoning: z.string().describe("One or two sentences on why the pieces work together"),
+  const { output } = await withModelFallback((model, abortSignal) =>
+    generateText({
+      model,
+      abortSignal,
+      maxRetries: 1,
+      instructions: INSTRUCTIONS,
+      output: Output.object({
+        schema: z.object({
+          itemRefs: z.array(z.enum(refs as [string, ...string[]])).min(1).max(7),
+          name: z.string().describe("Short catchy outfit name, max 5 words"),
+          reasoning: z.string().describe("One or two sentences on why the pieces work together"),
+        }),
       }),
+      prompt: request,
     }),
-    prompt: request,
-  });
+  );
 
   const counts = new Map<Category, number>();
   const itemIds: string[] = [];

@@ -2,14 +2,23 @@ import "server-only";
 
 import type { User as AuthUser } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 
+import { AUTH_ENABLED, DEV_USER } from "@/lib/auth-mode";
 import { LOGIN_PATH } from "@/lib/auth-routes";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 // Read-only check for rendering and reads: the signed-in user's id, verified from the
 // session JWT. Every query and action scopes its data to this id.
+// In demo mode (auth disabled) it's always the shared Dev User.
 export async function getCurrentUserId(): Promise<string | null> {
+  if (!AUTH_ENABLED) {
+    // No cookie read in demo mode, so mark the render as per-request explicitly; otherwise
+    // pages could be prerendered at build time with a stale closet.
+    await connection();
+    return DEV_USER.id;
+  }
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   return data?.claims.sub ?? null;
@@ -25,6 +34,7 @@ export async function requireUserId(): Promise<string> {
 
 // Signed-in user's email for display (header), or null when signed out.
 export async function getCurrentUserEmail(): Promise<string | null> {
+  if (!AUTH_ENABLED) return DEV_USER.email;
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   return (data?.claims.email as string | undefined) ?? null;
@@ -49,6 +59,10 @@ export async function syncUser(authUser: AuthUser) {
 
 // For mutations: the signed-in user's profile row (synced on demand as a safety net).
 export async function requireUser() {
+  if (!AUTH_ENABLED) {
+    const { id, ...profile } = DEV_USER;
+    return prisma.user.upsert({ where: { id }, update: {}, create: { id, ...profile } });
+  }
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) throw new Error("You must be signed in");

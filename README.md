@@ -10,6 +10,7 @@ Built with Next.js 16 (App Router), TypeScript, Tailwind CSS, shadcn/ui (Base UI
 - **Outfit canvas:** drag, resize and layer items, then save outfits with a name and occasion.
 - **AI stylist:** generates an outfit from your closet for an occasion and season.
 - **Accounts:** email/password sign-in (Google optional). All data is private to its owner.
+  Sign-in is currently **off** (demo mode, see below).
 
 ## Setup
 
@@ -32,6 +33,7 @@ Copy `.env.example` to `.env` and fill it in:
 | `SUPABASE_SERVICE_ROLE_KEY` | Same page (`service_role` / secret key). Keep it server-only. |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | https://aistudio.google.com/apikey (the free tier is enough) |
 | `SERPER_API_KEY` | https://serper.dev, needed for "Search online" (2,500 free searches) |
+| `AUTH_ENABLED` | `true` to require sign-in. Unset/`false` = demo mode (see below) |
 | `GOOGLE_AUTH_ENABLED` | `true` to show "Continue with Google" (see step 4) |
 
 ### 3. Database and storage
@@ -64,7 +66,17 @@ values ('closet', 'closet', true, 10485760, array['image/jpeg','image/png','imag
 npm run dev
 ```
 
-Open http://localhost:3000. You'll be asked to sign in or create an account.
+Open http://localhost:3000. In demo mode you go straight to the closet; with `AUTH_ENABLED="true"`, you'll be asked to sign in or create an account.
+
+## Demo mode (auth off)
+
+While `AUTH_ENABLED` isn't `"true"`, the app runs without sign-in:
+
+- **Open routes:** every route is open, `/login` redirects to `/closet`, and the proxy never calls Supabase Auth.
+- **One shared account:** all data belongs to a single built-in "Dev User" (`src/lib/auth-mode.ts`).
+- **Auth code stays in place:** all Supabase Auth code (login page, callback, proxy checks) remains. Set `AUTH_ENABLED="true"` and redeploy to turn it back on.
+
+**Don't launch publicly in demo mode.** Anyone with the URL can view and change the shared closet and use your Gemini and Serper quotas.
 
 ## Deploying to Vercel
 

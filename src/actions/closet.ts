@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { removeBackground } from "@/lib/ai/background";
 import { analyzeClothing } from "@/lib/ai/vision";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { ImageSearchNotConfiguredError, searchProductImages } from "@/lib/image-search";
 import { prisma } from "@/lib/prisma";
 import { fetchRemoteImage } from "@/lib/remote-image";
 import { removeImages, uploadImage } from "@/lib/storage";
+import { SupabaseConfigError } from "@/lib/supabase/config";
 import { IMAGE_EXTENSIONS, readImageFile } from "@/lib/uploads";
 import {
   clothingTagsSchema,
@@ -24,6 +26,10 @@ import type {
 } from "@/types";
 
 const NOT_SIGNED_IN = { success: false, error: "You must be signed in" } as const;
+// requireUser() fails for a missing session with auth on, but only for DB errors in demo mode.
+const USER_UNAVAILABLE = AUTH_ENABLED
+  ? NOT_SIGNED_IN
+  : ({ success: false, error: "Couldn't reach the database. Please try again." } as const);
 
 // Tags the photo with AI and cuts out the background, in parallel. Either step may fail
 // on its own; the user then fills in tags manually or keeps the original photo.
@@ -49,7 +55,7 @@ async function analyzeImage(
       tags: tags.status === "fulfilled" ? tags.value : null,
       cutoutDataUrl:
         cutout.status === "fulfilled"
-          ? `data:image/png;base64,${cutout.value.toString("base64")}`
+          ? `data:image/webp;base64,${cutout.value.toString("base64")}`
           : null,
     },
   };
@@ -132,14 +138,18 @@ export async function addClothingItem(
     user = await requireUser();
   } catch (error) {
     console.error(error);
-    return NOT_SIGNED_IN;
+    return USER_UNAVAILABLE;
   }
 
   const original = readImageFile(formData, "image");
   if (typeof original === "string") return { success: false, error: original };
 
   const cutout = formData.get("cutout");
-  if (cutout !== null && (!(cutout instanceof File) || cutout.type !== "image/png")) {
+  // WebP is what we produce now; PNG is still accepted from older clients.
+  if (
+    cutout !== null &&
+    (!(cutout instanceof File) || !["image/webp", "image/png"].includes(cutout.type))
+  ) {
     return { success: false, error: "Invalid background-removed image" };
   }
 
@@ -157,7 +167,8 @@ export async function addClothingItem(
 
   const id = crypto.randomUUID();
   const originalPath = `${user.id}/${id}/original.${IMAGE_EXTENSIONS[original.type]}`;
-  const cutoutPath = `${user.id}/${id}/cutout.png`;
+  const cutoutPath =
+    cutout instanceof File ? `${user.id}/${id}/cutout.${IMAGE_EXTENSIONS[cutout.type]}` : null;
   const uploaded: string[] = [];
 
   try {
@@ -166,8 +177,8 @@ export async function addClothingItem(
         uploaded.push(originalPath);
         return url;
       }),
-      cutout
-        ? uploadImage(cutoutPath, cutout, "image/png").then((url) => {
+      cutout instanceof File && cutoutPath
+        ? uploadImage(cutoutPath, cutout, cutout.type).then((url) => {
             uploaded.push(cutoutPath);
             return url;
           })
@@ -183,6 +194,9 @@ export async function addClothingItem(
   } catch (error) {
     console.error("Failed to save clothing item", error);
     await removeImages(uploaded);
+    if (error instanceof SupabaseConfigError) {
+      return { success: false, error: `Image storage isn't configured: ${error.message}` };
+    }
     return { success: false, error: "Couldn't save the item. Please try again." };
   }
 }

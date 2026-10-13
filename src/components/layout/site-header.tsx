@@ -4,8 +4,10 @@ import { LogOut, Sparkles } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
 import { NavLinks } from "@/components/layout/nav-links";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getCurrentUserEmail } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/auth-mode";
 
 export function SiteHeader() {
   return (
@@ -25,6 +27,21 @@ export function SiteHeader() {
 }
 
 async function HeaderActions() {
+  if (!AUTH_ENABLED) {
+    return (
+      <div className="flex items-center gap-1 sm:gap-3">
+        <NavLinks />
+        <Badge
+          variant="outline"
+          className="max-sm:hidden"
+          title="Sign-in is turned off; everyone shares one closet."
+        >
+          Demo mode
+        </Badge>
+      </div>
+    );
+  }
+
   const email = await getCurrentUserEmail();
 
   if (!email) {

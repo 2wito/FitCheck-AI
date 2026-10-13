@@ -154,7 +154,7 @@ export function UploadDialog() {
       const formData = new FormData();
       formData.append("image", step.upload.file);
       if (step.cutoutDataUrl) {
-        formData.append("cutout", await dataUrlToFile(step.cutoutDataUrl, "cutout.png"));
+        formData.append("cutout", await dataUrlToFile(step.cutoutDataUrl, "cutout.webp"));
       }
       for (const [key, value] of Object.entries(form)) formData.append(key, value);
 

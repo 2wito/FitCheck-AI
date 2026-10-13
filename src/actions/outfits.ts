@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
 import { generateOutfit } from "@/lib/ai/stylist";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { prisma } from "@/lib/prisma";
 import {
   generateOutfitSchema,
@@ -15,6 +16,10 @@ import {
 import type { ActionResult, StylistSuggestion } from "@/types";
 
 const NOT_SIGNED_IN = { success: false, error: "You must be signed in" } as const;
+// requireUser() fails for a missing session with auth on, but only for DB errors in demo mode.
+const USER_UNAVAILABLE = AUTH_ENABLED
+  ? NOT_SIGNED_IN
+  : ({ success: false, error: "Couldn't reach the database. Please try again." } as const);
 
 export async function saveOutfit(
   input: SaveOutfitInput,
@@ -30,7 +35,7 @@ export async function saveOutfit(
     user = await requireUser();
   } catch (error) {
     console.error(error);
-    return NOT_SIGNED_IN;
+    return USER_UNAVAILABLE;
   }
 
   // Every item must come from this user's own closet.
