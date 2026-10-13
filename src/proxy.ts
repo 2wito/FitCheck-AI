@@ -2,15 +2,29 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { LOGIN_PATH, isProtectedPath, safeNextPath } from "@/lib/auth-routes";
+import { SupabaseConfigError, getSupabaseConfig } from "@/lib/supabase/config";
 
 // Runs before every page request: refreshes the Supabase session cookie, sends signed-out
 // visitors of protected pages to /login, and sends signed-in visitors away from /login.
 export async function proxy(request: NextRequest) {
+  let config: ReturnType<typeof getSupabaseConfig>;
+  try {
+    config = getSupabaseConfig();
+  } catch (error) {
+    if (!(error instanceof SupabaseConfigError)) throw error;
+    // Without Supabase nothing works; say exactly what's misconfigured instead of a generic crash.
+    console.error(`[FitCheck AI] ${error.message}`);
+    return new NextResponse(`FitCheck AI is misconfigured.\n\n${error.message}\n`, {
+      status: 500,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    config.url,
+    config.anonKey,
     {
       cookies: {
         getAll() {
