@@ -1,48 +1,51 @@
-"use client";
-
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { LogOut, Sparkles } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
-const LINKS = [
-  { href: "/closet", label: "Closet" },
-  { href: "/outfits", label: "Outfits" },
-  { href: "/outfits/builder", label: "Create" },
-  { href: "/profile", label: "Profile" },
-];
+import { signOut } from "@/actions/auth";
+import { NavLinks } from "@/components/layout/nav-links";
+import { Button } from "@/components/ui/button";
+import { getCurrentUserEmail } from "@/lib/auth";
 
 export function SiteHeader() {
-  const pathname = usePathname();
-  // The most specific matching link wins, so /outfits/builder highlights "Create" only.
-  const active = LINKS.filter((link) => pathname.startsWith(link.href)).at(-1)?.href;
-
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/closet" className="flex items-center gap-1.5 font-semibold tracking-tight">
+        <Link href="/" className="flex items-center gap-1.5 font-semibold tracking-tight">
           <Sparkles className="size-4" />
           <span className="max-sm:sr-only">FitCheck AI</span>
         </Link>
-        <nav className="flex items-center gap-0.5 sm:gap-1" aria-label="Main">
-          {LINKS.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={active === href ? "page" : undefined}
-              className={cn(
-                "rounded-md px-2.5 py-1.5 text-sm transition-colors sm:px-3",
-                active === href
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+        {/* Reads the session cookie, so it streams in after the static shell. */}
+        <Suspense fallback={null}>
+          <HeaderActions />
+        </Suspense>
       </div>
     </header>
+  );
+}
+
+async function HeaderActions() {
+  const email = await getCurrentUserEmail();
+
+  if (!email) {
+    return (
+      <Button size="sm" nativeButton={false} render={<Link href="/login" />}>
+        Sign in
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 sm:gap-3">
+      <NavLinks />
+      <form action={signOut} className="flex items-center gap-2 border-l pl-1 sm:pl-3">
+        <span className="hidden max-w-40 truncate text-xs text-muted-foreground lg:inline" title={email}>
+          {email}
+        </span>
+        <Button type="submit" variant="ghost" size="icon-sm" aria-label="Sign out" title="Sign out">
+          <LogOut />
+        </Button>
+      </form>
+    </div>
   );
 }

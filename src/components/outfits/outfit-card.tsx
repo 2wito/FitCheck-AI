@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { deleteOutfit } from "@/actions/outfits";
 import { OutfitPreview } from "@/components/outfits/outfit-preview";
-import { TryOnModal } from "@/components/outfits/try-on-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -67,14 +66,8 @@ export function OutfitCard({ outfit }: { outfit: OutfitWithItems }) {
           render={<Link href={editHref} />}
         >
           <Pencil data-icon="inline-start" />
-          Open
+          Open in canvas
         </Button>
-
-        <TryOnModal
-          clothingItemIds={outfit.items.map((item) => item.clothingItemId)}
-          outfitId={outfit.id}
-          compact
-        />
 
         <Dialog open={confirmOpen} onOpenChange={(open) => !isDeleting && setConfirmOpen(open)}>
           <DialogTrigger

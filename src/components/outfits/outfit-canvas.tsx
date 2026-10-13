@@ -20,7 +20,6 @@ import { saveOutfit } from "@/actions/outfits";
 import { AiStylistDialog } from "@/components/outfits/ai-stylist-dialog";
 import { ClosetDrawer, DRAG_MIME } from "@/components/outfits/closet-drawer";
 import { SaveOutfitDialog, type OutfitDetails } from "@/components/outfits/save-outfit-dialog";
-import { TryOnModal } from "@/components/outfits/try-on-modal";
 import { Button } from "@/components/ui/button";
 import type { Occasion } from "@/lib/clothing";
 import {
@@ -227,10 +226,6 @@ export function OutfitCanvas({
             canvasHasItems={items.length > 0}
             disabled={closetItems.length < 2}
             onGenerated={applySuggestion}
-          />
-          <TryOnModal
-            clothingItemIds={items.map((item) => item.clothingItemId)}
-            outfitId={outfitId}
           />
           <SaveOutfitDialog
             defaults={details}

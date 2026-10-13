@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { ClothingGrid, ClothingGridSkeleton } from "@/components/closet/clothing-grid";
 import { UploadDialog } from "@/components/closet/upload-dialog";
-import { getCurrentUserId } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -30,10 +30,7 @@ export default function ClosetPage() {
 
 // Reads the session cookie, so it renders per request inside the Suspense boundary.
 async function ClosetItems() {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return <p className="text-muted-foreground">Sign in to see your closet.</p>;
-  }
+  const userId = await requireUserId();
 
   const items = await prisma.clothingItem.findMany({
     where: { userId },

@@ -1,45 +1,58 @@
 import "server-only";
 
+import type { User as AuthUser } from "@supabase/supabase-js";
+import { redirect } from "next/navigation";
+
+import { LOGIN_PATH } from "@/lib/auth-routes";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
-// TEMPORARY: sign-in isn't built yet. In development only, requests without a session act
-// as this demo user so the closet can be tested. Remove once auth ships.
-const DEV_USER = {
-  id: "00000000-0000-4000-8000-000000000001",
-  email: "dev@fitcheck.local",
-  name: "Dev User",
-};
-
-const devFallbackEnabled = process.env.NODE_ENV === "development";
-
-async function getAuthUser() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  return data.user;
-}
-
-// Read-only check for rendering: who is viewing, without touching the database.
+// Read-only check for rendering and reads: the signed-in user's id, verified from the
+// session JWT. Every query and action scopes its data to this id.
 export async function getCurrentUserId(): Promise<string | null> {
-  const user = await getAuthUser();
-  if (user) return user.id;
-  return devFallbackEnabled ? DEV_USER.id : null;
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  return data?.claims.sub ?? null;
 }
 
-// For mutations: returns the profile row, creating it on first use.
-export async function requireUser() {
-  const authUser = await getAuthUser();
-  const profile = authUser
-    ? { id: authUser.id, email: authUser.email ?? `${authUser.id}@users.noreply` }
-    : devFallbackEnabled
-      ? DEV_USER
-      : null;
+// For protected pages: the user's id, or a redirect to sign-in. The proxy normally
+// redirects first; this is the defense in depth if a page is ever reached without a session.
+export async function requireUserId(): Promise<string> {
+  const userId = await getCurrentUserId();
+  if (!userId) redirect(LOGIN_PATH);
+  return userId;
+}
 
-  if (!profile) throw new Error("You must be signed in");
+// Signed-in user's email for display (header), or null when signed out.
+export async function getCurrentUserEmail(): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  return (data?.claims.email as string | undefined) ?? null;
+}
+
+// Creates or updates the Prisma profile row for a Supabase Auth user. Called after every
+// successful sign-in, so the row exists before the user's first write.
+export async function syncUser(authUser: AuthUser) {
+  const metadata = authUser.user_metadata ?? {};
+  const profile = {
+    email: authUser.email ?? `${authUser.id}@users.noreply`,
+    name: (metadata.full_name ?? metadata.name ?? null) as string | null,
+    avatarUrl: (metadata.avatar_url ?? metadata.picture ?? null) as string | null,
+  };
 
   return prisma.user.upsert({
-    where: { id: profile.id },
-    update: {},
-    create: profile,
+    where: { id: authUser.id },
+    update: profile,
+    create: { id: authUser.id, ...profile },
   });
+}
+
+// For mutations: the signed-in user's profile row (synced on demand as a safety net).
+export async function requireUser() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) throw new Error("You must be signed in");
+
+  const existing = await prisma.user.findUnique({ where: { id: data.user.id } });
+  return existing ?? syncUser(data.user);
 }

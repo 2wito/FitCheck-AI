@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   // Loads ONNX model files from its own package directory at runtime, so it can't be bundled.
-  serverExternalPackages: ["@imgly/background-removal-node", "onnxruntime-node"],
+  // undici: loaded natively so its connection pool (and our SSRF-safe DNS lookup) works.
+  serverExternalPackages: ["@imgly/background-removal-node", "onnxruntime-node", "undici"],
   experimental: {
     serverActions: {
       // Uploads carry the photo plus its transparent PNG cutout.

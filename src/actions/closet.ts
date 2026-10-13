@@ -5,26 +5,35 @@ import { revalidatePath } from "next/cache";
 import { removeBackground } from "@/lib/ai/background";
 import { analyzeClothing } from "@/lib/ai/vision";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
+import { ImageSearchNotConfiguredError, searchProductImages } from "@/lib/image-search";
 import { prisma } from "@/lib/prisma";
+import { fetchRemoteImage } from "@/lib/remote-image";
 import { removeImages, uploadImage } from "@/lib/storage";
 import { IMAGE_EXTENSIONS, readImageFile } from "@/lib/uploads";
-import { clothingTagsSchema } from "@/lib/validations/clothing";
-import type { ActionResult, ClothingAnalysis, ClothingItem } from "@/types";
+import {
+  clothingTagsSchema,
+  remoteImageSchema,
+  searchQuerySchema,
+} from "@/lib/validations/clothing";
+import type {
+  ActionResult,
+  ClothingAnalysis,
+  ClothingItem,
+  ImageSearchResult,
+  RemoteClothingAnalysis,
+} from "@/types";
 
-// Step 1 of the upload flow: tag the photo with AI and cut out the background, in parallel.
-// Nothing is stored yet; the user reviews the result before saving.
-export async function analyzeClothingImage(
-  formData: FormData,
+const NOT_SIGNED_IN = { success: false, error: "You must be signed in" } as const;
+
+// Tags the photo with AI and cuts out the background, in parallel. Either step may fail
+// on its own; the user then fills in tags manually or keeps the original photo.
+async function analyzeImage(
+  bytes: Uint8Array<ArrayBuffer>,
+  mediaType: string,
 ): Promise<ActionResult<ClothingAnalysis>> {
-  if (!(await getCurrentUserId())) return { success: false, error: "You must be signed in" };
-
-  const image = readImageFile(formData, "image");
-  if (typeof image === "string") return { success: false, error: image };
-
-  const bytes = new Uint8Array(await image.arrayBuffer());
   const [tags, cutout] = await Promise.allSettled([
-    analyzeClothing(bytes, image.type),
-    removeBackground(bytes, image.type),
+    analyzeClothing(bytes, mediaType),
+    removeBackground(bytes, mediaType),
   ]);
 
   if (tags.status === "rejected") console.error("AI tagging failed", tags.reason);
@@ -46,6 +55,74 @@ export async function analyzeClothingImage(
   };
 }
 
+// Step 1 of the upload flow: analyze an uploaded photo. Nothing is stored yet; the user
+// reviews the result before saving.
+export async function analyzeClothingImage(
+  formData: FormData,
+): Promise<ActionResult<ClothingAnalysis>> {
+  if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
+
+  const image = readImageFile(formData, "image");
+  if (typeof image === "string") return { success: false, error: image };
+
+  return analyzeImage(new Uint8Array(await image.arrayBuffer()), image.type);
+}
+
+// Online search: finds product photos for a name/brand query.
+export async function searchClothingImages(
+  query: string,
+): Promise<ActionResult<ImageSearchResult[]>> {
+  if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
+
+  const parsed = searchQuerySchema.safeParse(query);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid search" };
+
+  try {
+    return { success: true, data: await searchProductImages(parsed.data) };
+  } catch (error) {
+    if (error instanceof ImageSearchNotConfiguredError) {
+      return { success: false, error: "Online search isn't set up yet (missing SERPER_API_KEY)." };
+    }
+    console.error("Image search failed", error);
+    return { success: false, error: "Search is unavailable right now. Please try again." };
+  }
+}
+
+// Step 1 for a search result: download the chosen image server-side, then run the same
+// analysis as an upload. The full-size image is tried first, then its thumbnail.
+export async function analyzeClothingImageFromUrl(
+  input: Pick<ImageSearchResult, "imageUrl" | "thumbnailUrl">,
+): Promise<ActionResult<RemoteClothingAnalysis>> {
+  if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
+
+  const parsed = remoteImageSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "Invalid image link" };
+
+  let image: Awaited<ReturnType<typeof fetchRemoteImage>> | null = null;
+  for (const url of new Set([parsed.data.imageUrl, parsed.data.thumbnailUrl])) {
+    try {
+      image = await fetchRemoteImage(url);
+      break;
+    } catch (error) {
+      console.warn("Couldn't fetch search image", url, error instanceof Error ? error.message : error);
+    }
+  }
+  if (!image) {
+    return { success: false, error: "That image couldn't be downloaded. Try another result." };
+  }
+
+  const analysis = await analyzeImage(new Uint8Array(image.data), image.mediaType);
+  if (!analysis.success) return analysis;
+
+  return {
+    success: true,
+    data: {
+      ...analysis.data,
+      imageDataUrl: `data:${image.mediaType};base64,${image.data.toString("base64")}`,
+    },
+  };
+}
+
 // Step 2: store the original photo and the transparent cutout, then save the item.
 export async function addClothingItem(
   formData: FormData,
@@ -55,7 +132,7 @@ export async function addClothingItem(
     user = await requireUser();
   } catch (error) {
     console.error(error);
-    return { success: false, error: "You must be signed in" };
+    return NOT_SIGNED_IN;
   }
 
   const original = readImageFile(formData, "image");

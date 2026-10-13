@@ -30,3 +30,16 @@ export const clothingTagsSchema = z.object({
 });
 
 export type ClothingTags = z.infer<typeof clothingTagsSchema>;
+
+export const searchQuerySchema = z
+  .string()
+  .trim()
+  .min(2, "Type at least 2 characters")
+  .max(100, "Keep the search under 100 characters");
+
+const httpUrl = z.url({ protocol: /^https?$/ }).max(2048);
+
+export const remoteImageSchema = z.object({
+  imageUrl: httpUrl,
+  thumbnailUrl: httpUrl,
+});

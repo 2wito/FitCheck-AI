@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { OutfitCanvas, type InitialOutfit } from "@/components/outfits/outfit-canvas";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCurrentUserId } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { OCCASIONS, type Occasion } from "@/lib/clothing";
 import { prisma } from "@/lib/prisma";
 
@@ -29,10 +29,7 @@ async function Builder({ searchParams }: Pick<PageProps<"/outfits/builder">, "se
   const outfitId = typeof id === "string" ? id : null;
   if (outfitId && !z.uuid().safeParse(outfitId).success) notFound();
 
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return <p className="text-muted-foreground">Sign in to build outfits.</p>;
-  }
+  const userId = await requireUserId();
 
   const [closetItems, outfit] = await Promise.all([
     prisma.clothingItem.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),

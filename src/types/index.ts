@@ -31,6 +31,18 @@ export type ClothingAnalysis = {
   cutoutDataUrl: string | null;
 };
 
+// One product photo from online image search.
+export type ImageSearchResult = {
+  imageUrl: string;
+  thumbnailUrl: string;
+  title: string;
+  source: string;
+};
+
+// Analysis of a search result: also returns the downloaded image (re-encoded as WebP),
+// so saving reuses the normal upload path.
+export type RemoteClothingAnalysis = ClothingAnalysis & { imageDataUrl: string };
+
 // One item placed on the outfit canvas (client-side shape of an OutfitItem).
 export type CanvasItem = CanvasTransform & { clothingItemId: string };
 

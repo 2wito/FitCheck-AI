@@ -6,7 +6,7 @@ import { Plus, Shirt } from "lucide-react";
 import { OutfitCard } from "@/components/outfits/outfit-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCurrentUserId } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -38,10 +38,7 @@ export default function OutfitsPage() {
 
 // Reads the session cookie, so it renders per request inside the Suspense boundary.
 async function OutfitList() {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return <p className="text-muted-foreground">Sign in to see your outfits.</p>;
-  }
+  const userId = await requireUserId();
 
   const outfits = await prisma.outfit.findMany({
     where: { userId },
