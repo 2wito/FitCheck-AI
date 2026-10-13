@@ -5,6 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-wood: var(--wood);
+  --color-wood-dark: var(--wood-dark);
+  --color-closet: var(--closet);
+  --color-closet-rod: var(--closet-rod);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
@@ -49,6 +53,11 @@
 }
 
 :root {
+  /* Visual wardrobe (closet page) */
+  --wood: oklch(0.72 0.07 65);
+  --wood-dark: oklch(0.55 0.07 55);
+  --closet: oklch(0.97 0.012 75);
+  --closet-rod: oklch(0.75 0.01 250);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -84,6 +93,10 @@
 }
 
 .dark {
+  --wood: oklch(0.45 0.05 55);
+  --wood-dark: oklch(0.33 0.04 50);
+  --closet: oklch(0.24 0.012 60);
+  --closet-rod: oklch(0.6 0.01 250);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);

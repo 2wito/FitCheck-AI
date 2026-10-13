@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { Season } from "@/generated/prisma/browser";
+import { BACKDROP_IDS } from "@/lib/backdrops";
 import { OCCASIONS } from "@/lib/clothing";
 import { MAX_SCALE, MIN_SCALE } from "@/lib/outfit-layout";
 
@@ -27,6 +28,14 @@ export const saveOutfitSchema = z.object({
       (items) => new Set(items.map((i) => i.clothingItemId)).size === items.length,
       "Each item can only appear once in an outfit",
     ),
+  backdrop: z.enum(BACKDROP_IDS).nullable(),
+  // Only sent when the score matches the items being saved (see canvas staleness check).
+  match: z
+    .object({
+      score: z.int().min(0).max(100),
+      summary: z.string().trim().max(500),
+    })
+    .nullable(),
 });
 
 export type SaveOutfitInput = z.infer<typeof saveOutfitSchema>;
@@ -37,3 +46,13 @@ export const generateOutfitSchema = z.object({
 });
 
 export type GenerateOutfitInput = z.infer<typeof generateOutfitSchema>;
+
+export const scoreOutfitSchema = z.object({
+  clothingItemIds: z
+    .array(z.uuid())
+    .min(2, "Add at least two items to get a match score")
+    .max(MAX_OUTFIT_ITEMS),
+  occasion: z.enum(OCCASIONS).nullable(),
+});
+
+export type ScoreOutfitInput = z.infer<typeof scoreOutfitSchema>;

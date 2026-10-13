@@ -22,3 +22,11 @@ export async function removeImages(paths: string[]) {
   const { error } = await createAdminClient().storage.from(CLOSET_BUCKET).remove(paths);
   if (error) console.error("Failed to clean up uploaded images", paths, error);
 }
+
+// ".../storage/v1/object/public/closet/<path>" -> "<path>", or null for any other URL.
+export function closetPathFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${CLOSET_BUCKET}/`;
+  const index = url.indexOf(marker);
+  return index === -1 ? null : decodeURIComponent(url.slice(index + marker.length).split("?")[0]);
+}

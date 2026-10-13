@@ -51,7 +51,19 @@ export type StylistSuggestion = {
   itemIds: string[];
   name: string;
   reasoning: string;
+  matchScore: number;
 };
+
+// Color & style match for a set of items. "estimate" = rule-based fallback when AI is
+// unavailable; "saved" = loaded with a saved outfit.
+export type MatchScore = {
+  score: number;
+  summary: string;
+  source: "ai" | "estimate" | "saved";
+};
+
+// A closet item plus how many saved outfits use it (shown when deleting).
+export type ClosetItem = ClothingItem & { _count: { outfitItems: number } };
 
 // Uniform return shape for Server Actions, so forms can render errors without try/catch.
 export type ActionResult<T = void> =

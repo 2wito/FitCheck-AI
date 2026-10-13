@@ -10,7 +10,11 @@ import {
   analyzeClothingImageFromUrl,
 } from "@/actions/closet";
 import { OnlineImageSearch } from "@/components/closet/google-search-dialog";
-import { Field, OptionSelect } from "@/components/shared/form-controls";
+import {
+  ClothingFields,
+  EMPTY_CLOTHING_FORM,
+  type ClothingFormValues,
+} from "@/components/closet/clothing-fields";
 import { ImageDropzone } from "@/components/shared/image-dropzone";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,18 +26,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Category, Season } from "@/generated/prisma/browser";
-import {
-  ACCEPTED_IMAGE_TYPES,
-  CATEGORY_LABELS,
-  SEASON_LABELS,
-  STYLES,
-  capitalize,
-} from "@/lib/clothing";
+import { ACCEPTED_IMAGE_TYPES } from "@/lib/clothing";
 import { dataUrlToFile, prepareImage } from "@/lib/image";
-import type { ClothingAnalysis, ClothingTags, ImageSearchResult } from "@/types";
+import type { ClothingAnalysis, ImageSearchResult } from "@/types";
 
 type Upload = {
   file: File;
@@ -46,25 +42,10 @@ type Step =
   | { kind: "analyzing"; previewUrl: string }
   | { kind: "review"; upload: Upload; cutoutDataUrl: string | null; aiFailed: boolean };
 
-type FormValues = Omit<ClothingTags, "secondaryColor"> & { secondaryColor: string };
-
-const EMPTY_FORM: FormValues = {
-  name: "",
-  category: Category.TOPS,
-  color: "",
-  secondaryColor: "",
-  season: Season.ALL_WEATHER,
-  style: "casual",
-};
-
-const categoryItems = Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label }));
-const seasonItems = Object.entries(SEASON_LABELS).map(([value, label]) => ({ value, label }));
-const styleItems = STYLES.map((style) => ({ value: style, label: capitalize(style) }));
-
 export function UploadDialog() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>({ kind: "select" });
-  const [form, setForm] = useState<FormValues>(EMPTY_FORM);
+  const [form, setForm] = useState<ClothingFormValues>(EMPTY_CLOTHING_FORM);
   const [isSaving, startSaving] = useTransition();
   // Ignores analysis results that arrive after the user has moved on to another photo.
   const requestId = useRef(0);
@@ -80,7 +61,7 @@ export function UploadDialog() {
   function reset() {
     requestId.current++;
     setStep({ kind: "select" });
-    setForm(EMPTY_FORM);
+    setForm(EMPTY_CLOTHING_FORM);
   }
 
   async function handleFile(file: File) {
@@ -141,7 +122,7 @@ export function UploadDialog() {
     setForm(
       tags
         ? { ...tags, secondaryColor: tags.secondaryColor ?? "" }
-        : { ...EMPTY_FORM, name: fallbackName.slice(0, 80) },
+        : { ...EMPTY_CLOTHING_FORM, name: fallbackName.slice(0, 80) },
     );
     setStep({ kind: "review", upload, cutoutDataUrl, aiFailed: !tags });
   }
@@ -239,66 +220,7 @@ export function UploadDialog() {
                 </p>
               )}
 
-              <Field label="Name" htmlFor="name">
-                <Input
-                  id="name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Navy crewneck sweater"
-                  maxLength={80}
-                  required
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Category">
-                  <OptionSelect
-                    label="Category"
-                    items={categoryItems}
-                    value={form.category}
-                    onChange={(category) => setForm({ ...form, category: category as Category })}
-                  />
-                </Field>
-                <Field label="Season">
-                  <OptionSelect
-                    label="Season"
-                    items={seasonItems}
-                    value={form.season}
-                    onChange={(season) => setForm({ ...form, season: season as Season })}
-                  />
-                </Field>
-              </div>
-
-              <Field label="Style">
-                <OptionSelect
-                  label="Style"
-                  items={styleItems}
-                  value={form.style}
-                  onChange={(style) => setForm({ ...form, style: style as FormValues["style"] })}
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Primary color" htmlFor="color">
-                  <Input
-                    id="color"
-                    value={form.color}
-                    onChange={(e) => setForm({ ...form, color: e.target.value })}
-                    placeholder="navy"
-                    maxLength={40}
-                    required
-                  />
-                </Field>
-                <Field label="Secondary color" htmlFor="secondaryColor">
-                  <Input
-                    id="secondaryColor"
-                    value={form.secondaryColor}
-                    onChange={(e) => setForm({ ...form, secondaryColor: e.target.value })}
-                    placeholder="Optional"
-                    maxLength={40}
-                  />
-                </Field>
-              </div>
+              <ClothingFields value={form} onChange={setForm} idPrefix="upload" />
             </div>
           </form>
         )}

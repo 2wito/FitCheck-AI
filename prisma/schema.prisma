@@ -64,13 +64,18 @@ model ClothingItem {
 }
 
 model Outfit {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @db.Uuid
-  name       String
-  occasion   String?
-  isFavorite Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  name         String
+  occasion     String?
+  isFavorite   Boolean  @default(false)
+  // Canvas backdrop id (see src/lib/backdrops.ts); null = default.
+  backdrop     String?
+  // Color & style match score (0–100) and its explanation, when the outfit was scored.
+  matchScore   Int?
+  matchSummary String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   items OutfitItem[]

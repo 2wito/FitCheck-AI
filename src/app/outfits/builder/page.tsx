@@ -6,6 +6,7 @@ import { z } from "zod";
 import { OutfitCanvas, type InitialOutfit } from "@/components/outfits/outfit-canvas";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUserId } from "@/lib/auth";
+import { BACKDROP_IDS, type BackdropId } from "@/lib/backdrops";
 import { OCCASIONS, type Occasion } from "@/lib/clothing";
 import { prisma } from "@/lib/prisma";
 
@@ -24,9 +25,11 @@ export default function BuilderPage({ searchParams }: PageProps<"/outfits/builde
 }
 
 // `?id=<outfitId>` opens a saved outfit for editing; no id starts a new one.
+// `?add=<itemId>` (closet "Send to canvas") places that item on the canvas.
 async function Builder({ searchParams }: Pick<PageProps<"/outfits/builder">, "searchParams">) {
-  const { id } = await searchParams;
+  const { id, add } = await searchParams;
   const outfitId = typeof id === "string" ? id : null;
+  const addId = typeof add === "string" && z.uuid().safeParse(add).success ? add : null;
   if (outfitId && !z.uuid().safeParse(outfitId).success) notFound();
 
   const userId = await requireUserId();
@@ -52,13 +55,19 @@ async function Builder({ searchParams }: Pick<PageProps<"/outfits/builder">, "se
       scale,
       zIndex,
     })),
+    backdrop: BACKDROP_IDS.includes(outfit.backdrop as BackdropId) ? (outfit.backdrop as BackdropId) : null,
+    match:
+      outfit.matchScore !== null
+        ? { score: outfit.matchScore, summary: outfit.matchSummary ?? "" }
+        : null,
   };
 
   return (
     <OutfitCanvas
-      key={outfit?.id ?? "new"}
+      key={`${outfit?.id ?? "new"}:${addId ?? ""}`}
       closetItems={closetItems}
       initialOutfit={initialOutfit}
+      initialAddId={addId}
     />
   );
 }

@@ -34,8 +34,15 @@ Rules:
 - Use color harmony: build around neutrals with at most one or two accent colors, pair complementary or analogous tones, and avoid clashing colors.
 - Never pick two items that do the same job (e.g. two pairs of shoes).
 
-Return the refs of the items you chose, a short catchy outfit name, and one or two
-sentences explaining why the pieces work together.`;
+Return the refs of the items you chose, a short catchy outfit name, one or two sentences
+explaining why the colors, textures and styles work together, and an honest color & style
+match score from 0 to 100.`;
+
+// One line per item for prompts: "item1 | TOPS | "Navy sweater" | colors: navy + white | ...".
+export function describeItem(item: Omit<StylistItem, "id">, ref: string) {
+  const colors = [item.color, item.secondaryColor].filter(Boolean).join(" + ") || "unknown";
+  return `${ref} | ${item.category} | "${item.name}" | colors: ${colors} | season: ${item.season} | style: ${item.style ?? "unspecified"}`;
+}
 
 export async function generateOutfit({
   items,
@@ -75,6 +82,7 @@ ${closet}`;
           itemRefs: z.array(z.enum(refs as [string, ...string[]])).min(1).max(7),
           name: z.string().describe("Short catchy outfit name, max 5 words"),
           reasoning: z.string().describe("One or two sentences on why the pieces work together"),
+          score: z.int().min(0).max(100).describe("Color & style match score, 0-100"),
         }),
       }),
       prompt: request,
@@ -91,5 +99,10 @@ ${closet}`;
     itemIds.push(item.id);
   }
 
-  return { itemIds, name: output.name.trim(), reasoning: output.reasoning.trim() };
+  return {
+    itemIds,
+    name: output.name.trim(),
+    reasoning: output.reasoning.trim(),
+    matchScore: Math.round(output.score),
+  };
 }

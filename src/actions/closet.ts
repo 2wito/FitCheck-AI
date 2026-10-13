@@ -9,7 +9,7 @@ import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { ImageSearchNotConfiguredError, searchProductImages } from "@/lib/image-search";
 import { prisma } from "@/lib/prisma";
 import { fetchRemoteImage } from "@/lib/remote-image";
-import { removeImages, uploadImage } from "@/lib/storage";
+import { closetPathFromUrl, removeImages, uploadImage } from "@/lib/storage";
 import { SupabaseConfigError } from "@/lib/supabase/config";
 import { IMAGE_EXTENSIONS, readImageFile } from "@/lib/uploads";
 import {
@@ -17,6 +17,7 @@ import {
   remoteImageSchema,
   searchQuerySchema,
 } from "@/lib/validations/clothing";
+import type { ClothingTags } from "@/lib/validations/clothing";
 import type {
   ActionResult,
   ClothingAnalysis,
@@ -199,4 +200,58 @@ export async function addClothingItem(
     }
     return { success: false, error: "Couldn't save the item. Please try again." };
   }
+}
+
+// Edits an item's tags (from the closet card's "Edit tags" dialog).
+export async function updateClothingItem(
+  id: string,
+  tags: ClothingTags,
+): Promise<ActionResult<ClothingItem>> {
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
+
+  const parsed = clothingTagsSchema.safeParse(tags);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid item details" };
+  }
+
+  // Scoping by userId means another user's item id simply isn't found.
+  const { count } = await prisma.clothingItem.updateMany({
+    where: { id, userId },
+    data: parsed.data,
+  });
+  if (count === 0) return { success: false, error: "Item not found" };
+
+  revalidatePath("/closet");
+  revalidatePath("/outfits");
+  const item = await prisma.clothingItem.findUniqueOrThrow({ where: { id } });
+  return { success: true, data: item };
+}
+
+// Deletes an item and its images. Saved outfits lose this piece (cascade) but are kept.
+export async function deleteClothingItem(id: string): Promise<ActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
+
+  const item = await prisma.clothingItem.findFirst({
+    where: { id, userId },
+    select: { imageUrl: true, bgRemovedUrl: true },
+  });
+  if (!item) return { success: false, error: "Item not found" };
+
+  try {
+    await prisma.clothingItem.delete({ where: { id } });
+  } catch (error) {
+    console.error("Failed to delete clothing item", error);
+    return { success: false, error: "Couldn't delete the item. Please try again." };
+  }
+
+  // Storage cleanup is best-effort: the item is already gone from the closet.
+  await removeImages(
+    [item.imageUrl, item.bgRemovedUrl].map(closetPathFromUrl).filter((p): p is string => !!p),
+  ).catch((error) => console.error("Failed to remove item images", error));
+
+  revalidatePath("/closet");
+  revalidatePath("/outfits");
+  return { success: true, data: undefined };
 }

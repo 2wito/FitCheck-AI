@@ -7,7 +7,10 @@ import { APICallError, RetryError, type LanguageModel } from "ai";
 // need a vision-capable model. The fallback is used when the primary is overloaded.
 const PRIMARY_MODEL = process.env.GEMINI_MODEL ?? "gemini-flash-latest";
 const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL ?? "gemini-flash-lite-latest";
-const MODELS = [...new Set([PRIMARY_MODEL, FALLBACK_MODEL])].map((id) => ({ id, model: google(id) }));
+const MODELS = [...new Set([PRIMARY_MODEL, FALLBACK_MODEL])].map((id) => ({
+  id,
+  model: google(id),
+}));
 
 // Per attempt, including the SDK's own retries. Keeps a slow model from running past the
 // serverless function limit (300s on Vercel) with the user staring at a spinner.
@@ -31,19 +34,24 @@ function isTransient(error: unknown) {
 
 // Runs an AI call on the primary model, falling back to the next one when Gemini's shared
 // capacity is temporarily unavailable ("This model is currently experiencing high demand").
+// `timeoutMs` can be lowered for calls that have a cheap non-AI fallback.
 export async function withModelFallback<T>(
   call: (model: LanguageModel, abortSignal: AbortSignal) => Promise<T>,
+  { timeoutMs = ATTEMPT_TIMEOUT_MS }: { timeoutMs?: number } = {},
 ): Promise<T> {
   assertAiConfigured();
 
   let lastError: unknown;
   for (const { id, model } of MODELS) {
     try {
-      return await call(model, AbortSignal.timeout(ATTEMPT_TIMEOUT_MS));
+      return await call(model, AbortSignal.timeout(timeoutMs));
     } catch (error) {
       if (!isTransient(error)) throw error;
       lastError = error;
-      console.warn(`AI model ${id} unavailable, trying fallback:`, error instanceof Error ? error.message : error);
+      console.warn(
+        `AI model ${id} unavailable, trying fallback:`,
+        error instanceof Error ? error.message : error,
+      );
     }
   }
   throw lastError;

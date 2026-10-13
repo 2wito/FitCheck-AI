@@ -1,91 +1,65 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import { Shirt } from "lucide-react";
 
+import { ItemQuickActions } from "@/components/closet/item-actions";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Category } from "@/generated/prisma/browser";
 import { CATEGORY_LABELS, SEASON_LABELS } from "@/lib/clothing";
-import type { ClothingItem } from "@/types";
+import type { ClosetItem } from "@/types";
 
-type Filter = "ALL" | Category;
+const MASONRY_CLASSES = "columns-2 gap-4 sm:columns-3 lg:columns-4 xl:columns-5";
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: "ALL", label: "All" },
-  ...Object.values(Category).map((category) => ({
-    value: category,
-    label: CATEGORY_LABELS[category],
-  })),
-];
-
-const GRID_CLASSES = "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4";
-
-export function ClothingGrid({ items }: { items: ClothingItem[] }) {
-  const [filter, setFilter] = useState<Filter>("ALL");
-
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        title="Your closet is empty"
-        description='Add your first item with the "Add item" button to start building outfits.'
-      />
-    );
-  }
-
-  const visible = filter === "ALL" ? items : items.filter((item) => item.category === filter);
-  const countFor = (value: Filter) =>
-    value === "ALL" ? items.length : items.filter((item) => item.category === value).length;
-
+// Pinterest-style grid: CSS columns let every photo keep its own aspect ratio.
+export function MasonryGrid({
+  items,
+  onEdit,
+  onDelete,
+}: {
+  items: ClosetItem[];
+  onEdit: (item: ClosetItem) => void;
+  onDelete: (item: ClosetItem) => void;
+}) {
   return (
-    <div className="flex flex-col gap-6">
-      <Tabs value={filter} onValueChange={(value) => setFilter(value as Filter)}>
-        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TabsList>
-            {FILTERS.map(({ value, label }) => (
-              <TabsTrigger key={value} value={value} className="px-3">
-                {label}
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {countFor(value)}
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
-      </Tabs>
-
-      {visible.length === 0 ? (
-        <EmptyState
-          title={`No ${CATEGORY_LABELS[filter as Category].toLowerCase()} yet`}
-          description="Items you add in this category will show up here."
-        />
-      ) : (
-        <ul className={GRID_CLASSES}>
-          {visible.map((item) => (
-            <li key={item.id}>
-              <ClothingCard item={item} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul className={MASONRY_CLASSES}>
+      {items.map((item) => (
+        <li key={item.id} className="mb-4 break-inside-avoid">
+          <ClothingCard item={item} onEdit={onEdit} onDelete={onDelete} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function ClothingCard({ item }: { item: ClothingItem }) {
+function ClothingCard({
+  item,
+  onEdit,
+  onDelete,
+}: {
+  item: ClosetItem;
+  onEdit: (item: ClosetItem) => void;
+  onDelete: (item: ClosetItem) => void;
+}) {
   const colors = [item.color, item.secondaryColor].filter(Boolean).join(" / ");
 
   return (
     <article className="group flex flex-col gap-2">
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-muted/60 ring-1 ring-foreground/5">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-muted/40 to-muted/80 p-4 ring-1 ring-foreground/5 transition-shadow group-hover:shadow-lg">
+        {/* Intrinsic size is unknown; width/height only reserve space, h-auto keeps the real ratio. */}
         <Image
           src={item.bgRemovedUrl ?? item.imageUrl}
           alt={item.name}
-          fill
-          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-          className="object-contain p-4 transition-transform duration-300 group-hover:scale-105"
+          width={600}
+          height={750}
+          sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+          className="h-auto w-full transition-transform duration-300 group-hover:scale-[1.03]"
+        />
+        <ItemQuickActions
+          item={item}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          className="absolute top-2 right-2"
         />
       </div>
       <div className="flex flex-col gap-1 px-0.5">
@@ -105,7 +79,7 @@ function ClothingCard({ item }: { item: ClothingItem }) {
   );
 }
 
-function EmptyState({ title, description }: { title: string; description: string }) {
+export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-16 text-center">
       <div className="flex size-12 items-center justify-center rounded-full bg-muted">
@@ -119,17 +93,15 @@ function EmptyState({ title, description }: { title: string; description: string
   );
 }
 
+const SKELETON_HEIGHTS = ["h-56", "h-72", "h-48", "h-64", "h-80", "h-52", "h-60", "h-68"];
+
 export function ClothingGridSkeleton() {
   return (
     <div className="flex flex-col gap-6">
-      <Skeleton className="h-8 w-full max-w-lg" />
-      <div className={GRID_CLASSES}>
-        {Array.from({ length: 8 }, (_, i) => (
-          <div key={i} className="flex flex-col gap-2">
-            <Skeleton className="aspect-square rounded-xl" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
+      <Skeleton className="h-8 w-full max-w-2xl" />
+      <div className={MASONRY_CLASSES}>
+        {SKELETON_HEIGHTS.map((height, i) => (
+          <Skeleton key={i} className={`mb-4 ${height} break-inside-avoid rounded-2xl`} />
         ))}
       </div>
     </div>

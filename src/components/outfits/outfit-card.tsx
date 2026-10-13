@@ -6,6 +6,7 @@ import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteOutfit } from "@/actions/outfits";
+import { MatchBadge } from "@/components/outfits/match-score";
 import { OutfitPreview } from "@/components/outfits/outfit-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export function OutfitCard({ outfit }: { outfit: OutfitWithItems }) {
       <Link href={editHref} aria-label={`Open ${outfit.name} in the canvas`}>
         <OutfitPreview
           items={outfit.items}
+          backdrop={outfit.backdrop}
           className="transition-shadow group-hover:ring-foreground/20 group-hover:shadow-md"
         />
       </Link>
@@ -50,8 +52,9 @@ export function OutfitCard({ outfit }: { outfit: OutfitWithItems }) {
       <div className="flex items-start justify-between gap-2 px-0.5">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-medium">{outfit.name}</h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
             {outfit.items.length} {outfit.items.length === 1 ? "item" : "items"}
+            {outfit.matchScore !== null && <MatchBadge score={outfit.matchScore} />}
           </p>
         </div>
         {outfit.occasion && <Badge variant="secondary">{capitalize(outfit.occasion)}</Badge>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -12,15 +12,17 @@ import {
   SendToBack,
   Sparkles,
   Trash2,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { saveOutfit } from "@/actions/outfits";
+import { saveOutfit, scoreOutfit } from "@/actions/outfits";
 import { AiStylistDialog } from "@/components/outfits/ai-stylist-dialog";
+import { BackdropPicker } from "@/components/outfits/backdrop-picker";
 import { ClosetDrawer, DRAG_MIME } from "@/components/outfits/closet-drawer";
+import { MatchScorePanel } from "@/components/outfits/match-score";
 import { SaveOutfitDialog, type OutfitDetails } from "@/components/outfits/save-outfit-dialog";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_BACKDROP, getBackdrop, type BackdropId } from "@/lib/backdrops";
 import type { Occasion } from "@/lib/clothing";
 import {
   autoLayout,
@@ -35,9 +37,18 @@ import {
 } from "@/lib/outfit-layout";
 import { cn } from "@/lib/utils";
 import { MAX_OUTFIT_ITEMS } from "@/lib/validations/outfit";
-import type { CanvasItem, ClothingItem, StylistSuggestion } from "@/types";
+import type { CanvasItem, ClothingItem, MatchScore, StylistSuggestion } from "@/types";
 
-export type InitialOutfit = OutfitDetails & { id: string; items: CanvasItem[] };
+export type InitialOutfit = OutfitDetails & {
+  id: string;
+  items: CanvasItem[];
+  backdrop: BackdropId | null;
+  match: Pick<MatchScore, "score" | "summary"> | null;
+};
+
+// A score is tied to the exact set of items it rated (positions don't matter).
+type ScoredMatch = { value: MatchScore; itemsKey: string };
+const itemsKey = (ids: Iterable<string>) => [...ids].sort().join(",");
 
 type Point = { x: number; y: number };
 
@@ -47,9 +58,12 @@ const SCALE_STEP = 1.1;
 export function OutfitCanvas({
   closetItems,
   initialOutfit,
+  initialAddId,
 }: {
   closetItems: ClothingItem[];
   initialOutfit: InitialOutfit | null;
+  // From the closet's "Send to canvas" action (?add=<itemId>).
+  initialAddId: string | null;
 }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -58,19 +72,38 @@ export function OutfitCanvas({
     [closetItems],
   );
 
-  const [items, setItems] = useState<CanvasItem[]>(() =>
-    (initialOutfit?.items ?? []).filter((item) => closetById.has(item.clothingItemId)),
-  );
+  const [items, setItems] = useState<CanvasItem[]>(() => {
+    const initial = (initialOutfit?.items ?? []).filter((item) =>
+      closetById.has(item.clothingItemId),
+    );
+    const added = initialAddId ? closetById.get(initialAddId) : undefined;
+    if (!added || initial.some((item) => item.clothingItemId === added.id)) return initial;
+    const slot = slotFor(
+      added.category,
+      initial.map((item) => closetById.get(item.clothingItemId)!.category),
+    );
+    return [...initial, { clothingItemId: added.id, ...slot, zIndex: topZIndex(initial) + 1 }];
+  });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [outfitId, setOutfitId] = useState(initialOutfit?.id ?? null);
   const [details, setDetails] = useState<OutfitDetails>({
     name: initialOutfit?.name ?? "",
     occasion: initialOutfit?.occasion ?? "casual",
   });
-  const [stylistNote, setStylistNote] = useState<string | null>(null);
+  const [backdrop, setBackdrop] = useState<BackdropId>(initialOutfit?.backdrop ?? DEFAULT_BACKDROP);
+  const [match, setMatch] = useState<ScoredMatch | null>(() =>
+    initialOutfit?.match
+      ? {
+          value: { ...initialOutfit.match, source: "saved" },
+          itemsKey: itemsKey(initialOutfit.items.map((i) => i.clothingItemId)),
+        }
+      : null,
+  );
+  const [isScoring, startScoring] = useTransition();
   const [isDragOver, setIsDragOver] = useState(false);
 
   const onCanvas = useMemo(() => new Set(items.map((item) => item.clothingItemId)), [items]);
+  const matchIsStale = match !== null && match.itemsKey !== itemsKey(onCanvas);
   const categoryOf = (id: string) => closetById.get(id)!.category;
 
   function addItem(id: string, at?: Point) {
@@ -122,13 +155,20 @@ export function OutfitCanvas({
   }
 
   function autoArrange() {
-    setItems(autoLayout(items.map((item) => ({ id: item.clothingItemId, category: categoryOf(item.clothingItemId) }))));
+    setItems(
+      autoLayout(
+        items.map((item) => ({
+          id: item.clothingItemId,
+          category: categoryOf(item.clothingItemId),
+        })),
+      ),
+    );
   }
 
   function clearCanvas() {
     setItems([]);
     setSelectedId(null);
-    setStylistNote(null);
+    setMatch(null);
   }
 
   function applySuggestion(suggestion: StylistSuggestion, occasion: Occasion) {
@@ -138,8 +178,25 @@ export function OutfitCanvas({
     });
     setItems(autoLayout(picked));
     setSelectedId(null);
-    setStylistNote(suggestion.reasoning);
+    setMatch({
+      value: { score: suggestion.matchScore, summary: suggestion.reasoning, source: "ai" },
+      itemsKey: itemsKey(picked.map((p) => p.id)),
+    });
     setDetails({ name: suggestion.name, occasion });
+  }
+
+  function checkMatch() {
+    const ids = items.map((item) => item.clothingItemId);
+    startScoring(async () => {
+      const result = await scoreOutfit({ clothingItemIds: ids, occasion: details.occasion }).catch(
+        () => null,
+      );
+      if (!result?.success) {
+        toast.error(result?.error ?? "Couldn't score the outfit. Please try again.");
+        return;
+      }
+      setMatch({ value: result.data, itemsKey: itemsKey(ids) });
+    });
   }
 
   async function handleSave(next: OutfitDetails, asNew: boolean) {
@@ -147,6 +204,10 @@ export function OutfitCanvas({
       id: asNew ? undefined : (outfitId ?? undefined),
       ...next,
       items,
+      backdrop,
+      // Only persist a score that still describes these exact items.
+      match:
+        match && !matchIsStale ? { score: match.value.score, summary: match.value.summary } : null,
     }).catch(() => null);
 
     if (!result?.success) {
@@ -209,6 +270,7 @@ export function OutfitCanvas({
 
   const selected = items.find((item) => item.clothingItemId === selectedId) ?? null;
   const maxZ = topZIndex(items);
+  const scene = getBackdrop(backdrop);
 
   return (
     <div className="flex flex-col gap-6">
@@ -245,26 +307,49 @@ export function OutfitCanvas({
           />
         </div>
 
-        <section className="order-1 flex flex-col items-center gap-3 lg:order-2" aria-label="Outfit canvas">
+        <section
+          className="order-1 flex flex-col items-center gap-3 lg:order-2"
+          aria-label="Outfit canvas"
+        >
           <div
             className="flex w-full flex-wrap items-center justify-between gap-2"
             role="toolbar"
             aria-label="Canvas tools"
           >
             <div className="flex items-center gap-1">
-              <ToolButton label="Bring forward ( ] )" disabled={!selected || selected.zIndex >= maxZ} onClick={() => changeLayer(selected!.clothingItemId, 1)}>
+              <ToolButton
+                label="Bring forward ( ] )"
+                disabled={!selected || selected.zIndex >= maxZ}
+                onClick={() => changeLayer(selected!.clothingItemId, 1)}
+              >
                 <BringToFront />
               </ToolButton>
-              <ToolButton label="Send backward ( [ )" disabled={!selected || selected.zIndex <= 0} onClick={() => changeLayer(selected!.clothingItemId, -1)}>
+              <ToolButton
+                label="Send backward ( [ )"
+                disabled={!selected || selected.zIndex <= 0}
+                onClick={() => changeLayer(selected!.clothingItemId, -1)}
+              >
                 <SendToBack />
               </ToolButton>
-              <ToolButton label="Smaller ( - )" disabled={!selected} onClick={() => rescale(selected!.clothingItemId, 1 / SCALE_STEP)}>
+              <ToolButton
+                label="Smaller ( - )"
+                disabled={!selected}
+                onClick={() => rescale(selected!.clothingItemId, 1 / SCALE_STEP)}
+              >
                 <Minus />
               </ToolButton>
-              <ToolButton label="Larger ( + )" disabled={!selected} onClick={() => rescale(selected!.clothingItemId, SCALE_STEP)}>
+              <ToolButton
+                label="Larger ( + )"
+                disabled={!selected}
+                onClick={() => rescale(selected!.clothingItemId, SCALE_STEP)}
+              >
                 <Plus />
               </ToolButton>
-              <ToolButton label="Remove (Delete)" disabled={!selected} onClick={() => removeItem(selected!.clothingItemId)}>
+              <ToolButton
+                label="Remove (Delete)"
+                disabled={!selected}
+                onClick={() => removeItem(selected!.clothingItemId)}
+              >
                 <Trash2 />
               </ToolButton>
             </div>
@@ -299,16 +384,24 @@ export function OutfitCanvas({
               e.preventDefault();
               addItem(id, pointToCanvas(e.clientX, e.clientY));
             }}
+            style={scene.style}
             className={cn(
-              "relative aspect-[3/4] w-full max-w-[min(100%,calc((100dvh-15rem)*0.75))] overflow-hidden rounded-2xl bg-muted/40 ring-1 ring-foreground/10 transition-shadow select-none",
+              "relative aspect-[3/4] w-full max-w-[min(100%,calc((100dvh-15rem)*0.75))] overflow-hidden rounded-2xl ring-1 ring-foreground/10 transition-shadow select-none",
+              scene.className,
               isDragOver && "ring-2 ring-foreground/40",
             )}
           >
             {items.length === 0 && (
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 p-8 text-center",
+                  scene.tone === "dark" ? "text-white/80" : "text-zinc-600",
+                )}
+              >
                 <Sparkles className="size-6" />
                 <p className="max-w-xs text-sm">
-                  Drag items here, click them in your closet, or let the AI stylist pick an outfit for you.
+                  Drag items here, click them in your closet, or let the AI stylist pick an outfit
+                  for you.
                 </p>
               </div>
             )}
@@ -327,27 +420,20 @@ export function OutfitCanvas({
             ))}
           </div>
 
+          <BackdropPicker value={backdrop} onChange={setBackdrop} />
+
           <p className="text-center text-xs text-muted-foreground">
-            Drag to move · drag the corner handle to resize · select an item and use arrow keys, + / −, [ / ] or Delete
+            Drag to move · drag the corner handle to resize · select an item and use arrow keys, + /
+            −, [ / ] or Delete
           </p>
 
-          {stylistNote && (
-            <div className="flex w-full max-w-xl items-start gap-2 rounded-xl border bg-card p-3 text-sm">
-              <Sparkles className="mt-0.5 size-4 shrink-0" />
-              <p className="flex-1">
-                <span className="font-medium">Stylist&apos;s note: </span>
-                {stylistNote}
-              </p>
-              <button
-                type="button"
-                onClick={() => setStylistNote(null)}
-                aria-label="Dismiss stylist's note"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          )}
+          <MatchScorePanel
+            match={match?.value ?? null}
+            stale={matchIsStale}
+            pending={isScoring}
+            canScore={items.length >= 2}
+            onCheck={checkMatch}
+          />
         </section>
       </div>
     </div>
@@ -442,7 +528,7 @@ function CanvasItemView({
       style={itemBoxStyle(item)}
       className={cn(
         "absolute cursor-move touch-none rounded-lg outline-none",
-        selected && "outline-2 outline-offset-2 outline-dashed outline-foreground/50",
+        selected && "outline-2 outline-offset-2 outline-dashed outline-sky-500",
       )}
     >
       <Image

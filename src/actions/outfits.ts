@@ -3,17 +3,21 @@
 import { revalidatePath } from "next/cache";
 
 import { Prisma } from "@/generated/prisma/client";
+import { scoreOutfitWithAI } from "@/lib/ai/match";
 import { generateOutfit } from "@/lib/ai/stylist";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
 import { AUTH_ENABLED } from "@/lib/auth-mode";
+import { estimateMatch } from "@/lib/match-score";
 import { prisma } from "@/lib/prisma";
 import {
   generateOutfitSchema,
   saveOutfitSchema,
+  scoreOutfitSchema,
   type GenerateOutfitInput,
   type SaveOutfitInput,
+  type ScoreOutfitInput,
 } from "@/lib/validations/outfit";
-import type { ActionResult, StylistSuggestion } from "@/types";
+import type { ActionResult, MatchScore, StylistSuggestion } from "@/types";
 
 const NOT_SIGNED_IN = { success: false, error: "You must be signed in" } as const;
 // requireUser() fails for a missing session with auth on, but only for DB errors in demo mode.
@@ -28,7 +32,12 @@ export async function saveOutfit(
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid outfit" };
   }
-  const { id, name, occasion, items } = parsed.data;
+  const { id, name, occasion, items, backdrop, match } = parsed.data;
+  const extras = {
+    backdrop,
+    matchScore: match?.score ?? null,
+    matchSummary: match?.summary ?? null,
+  };
 
   let user;
   try {
@@ -51,11 +60,11 @@ export async function saveOutfit(
       ? // Scoping the update to userId means another user's outfit id simply isn't found.
         await prisma.outfit.update({
           where: { id, userId: user.id },
-          data: { name, occasion, items: { deleteMany: {}, create: items } },
+          data: { name, occasion, ...extras, items: { deleteMany: {}, create: items } },
           select: { id: true },
         })
       : await prisma.outfit.create({
-          data: { userId: user.id, name, occasion, items: { create: items } },
+          data: { userId: user.id, name, occasion, ...extras, items: { create: items } },
           select: { id: true },
         });
 
@@ -123,5 +132,33 @@ export async function generateOutfitWithAI(
   } catch (error) {
     console.error("AI outfit generation failed", error);
     return { success: false, error: "The AI stylist is unavailable right now. Please try again." };
+  }
+}
+
+// Color & style match score for the items on the canvas. Asks Gemini; if it's unavailable
+// (quota, overload), falls back to a rule-based estimate so the user always gets a score.
+export async function scoreOutfit(input: ScoreOutfitInput): Promise<ActionResult<MatchScore>> {
+  const parsed = scoreOutfitSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid outfit" };
+  }
+
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
+
+  const items = await prisma.clothingItem.findMany({
+    where: { userId, id: { in: parsed.data.clothingItemIds } },
+    select: { name: true, category: true, color: true, secondaryColor: true, season: true, style: true },
+  });
+  if (items.length !== parsed.data.clothingItemIds.length) {
+    return { success: false, error: "Some items are no longer in your closet" };
+  }
+
+  try {
+    const result = await scoreOutfitWithAI(items, parsed.data.occasion);
+    return { success: true, data: { ...result, source: "ai" } };
+  } catch (error) {
+    console.warn("AI match score unavailable, using estimate:", error instanceof Error ? error.message : error);
+    return { success: true, data: { ...estimateMatch(items), source: "estimate" } };
   }
 }

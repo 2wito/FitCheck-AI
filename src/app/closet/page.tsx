@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { ClothingGrid, ClothingGridSkeleton } from "@/components/closet/clothing-grid";
+import { ClothingGridSkeleton } from "@/components/closet/clothing-grid";
+import { ClosetView } from "@/components/closet/closet-view";
 import { UploadDialog } from "@/components/closet/upload-dialog";
 import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -35,7 +36,9 @@ async function ClosetItems() {
   const items = await prisma.clothingItem.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
+    // Outfit count is shown when deleting an item that saved outfits use.
+    include: { _count: { select: { outfitItems: true } } },
   });
 
-  return <ClothingGrid items={items} />;
+  return <ClosetView items={items} />;
 }
