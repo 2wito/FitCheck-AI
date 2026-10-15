@@ -89,4 +89,5 @@ Add every variable from step 2 in Vercel → Settings → Environment Variables 
 
 - `src/proxy.ts` (Next.js 16's replacement for `middleware.ts`) refreshes the Supabase session and redirects signed-out visitors away from `/closet` and `/outfits`.
 - Images from "Search online" are downloaded server-side through `src/lib/remote-image.ts`. It blocks private and internal addresses (SSRF protection), caps size and time, and re-encodes every image.
-- Background removal uses `@imgly/background-removal-node`, which is AGPL-3.0. Replace `src/lib/ai/background.ts` if that license doesn't fit your use.
+- Background removal runs in the browser with `@imgly/background-removal` (`src/lib/background-removal.ts`), so the server needs no native ML binaries. The model (~44 MB) downloads from IMG.LY's CDN on first use and is then cached. The library is AGPL-3.0; replace that one file if the license doesn't fit your use.
+- The app sends `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy: credentialless` headers (`next.config.ts`), which let background removal use multiple threads (about 5× faster).

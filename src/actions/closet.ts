@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 
-import { removeBackground } from "@/lib/ai/background";
 import { analyzeClothing } from "@/lib/ai/vision";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
 import { AUTH_ENABLED } from "@/lib/auth-mode";
@@ -32,34 +31,19 @@ const USER_UNAVAILABLE = AUTH_ENABLED
   ? NOT_SIGNED_IN
   : ({ success: false, error: "Couldn't reach the database. Please try again." } as const);
 
-// Tags the photo with AI and cuts out the background, in parallel. Either step may fail
-// on its own; the user then fills in tags manually or keeps the original photo.
+// AI tagging. Background removal runs in the browser (src/lib/background-removal.ts), so
+// the server needs no native ML binaries. A tagging failure isn't fatal: the user fills in
+// the details (or quick capture saves the item as untagged).
 async function analyzeImage(
   bytes: Uint8Array<ArrayBuffer>,
   mediaType: string,
 ): Promise<ActionResult<ClothingAnalysis>> {
-  const [tags, cutout] = await Promise.allSettled([
-    analyzeClothing(bytes, mediaType),
-    removeBackground(bytes, mediaType),
-  ]);
-
-  if (tags.status === "rejected") console.error("AI tagging failed", tags.reason);
-  if (cutout.status === "rejected") console.error("Background removal failed", cutout.reason);
-
-  if (tags.status === "rejected" && cutout.status === "rejected") {
-    return { success: false, error: "We couldn't process this photo. Please try another one." };
+  try {
+    return { success: true, data: { tags: await analyzeClothing(bytes, mediaType) } };
+  } catch (error) {
+    console.error("AI tagging failed", error);
+    return { success: true, data: { tags: null } };
   }
-
-  return {
-    success: true,
-    data: {
-      tags: tags.status === "fulfilled" ? tags.value : null,
-      cutoutDataUrl:
-        cutout.status === "fulfilled"
-          ? `data:image/webp;base64,${cutout.value.toString("base64")}`
-          : null,
-    },
-  };
 }
 
 // Step 1 of the upload flow: analyze an uploaded photo. Nothing is stored yet; the user
@@ -82,7 +66,8 @@ export async function searchClothingImages(
   if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
 
   const parsed = searchQuerySchema.safeParse(query);
-  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid search" };
+  if (!parsed.success)
+    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid search" };
 
   try {
     return { success: true, data: await searchProductImages(parsed.data) };
@@ -111,7 +96,11 @@ export async function analyzeClothingImageFromUrl(
       image = await fetchRemoteImage(url);
       break;
     } catch (error) {
-      console.warn("Couldn't fetch search image", url, error instanceof Error ? error.message : error);
+      console.warn(
+        "Couldn't fetch search image",
+        url,
+        error instanceof Error ? error.message : error,
+      );
     }
   }
   if (!image) {
@@ -131,9 +120,7 @@ export async function analyzeClothingImageFromUrl(
 }
 
 // Step 2: store the original photo and the transparent cutout, then save the item.
-export async function addClothingItem(
-  formData: FormData,
-): Promise<ActionResult<ClothingItem>> {
+export async function addClothingItem(formData: FormData): Promise<ActionResult<ClothingItem>> {
   let user;
   try {
     user = await requireUser();

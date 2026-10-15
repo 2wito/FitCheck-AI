@@ -4,14 +4,28 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
-  // Loads ONNX model files from its own package directory at runtime, so it can't be bundled.
   // undici: loaded natively so its connection pool (and our SSRF-safe DNS lookup) works.
-  serverExternalPackages: ["@imgly/background-removal-node", "onnxruntime-node", "undici"],
+  serverExternalPackages: ["undici"],
   experimental: {
     serverActions: {
-      // Uploads carry the photo plus its transparent PNG cutout.
+      // Uploads carry the photo plus its transparent WebP cutout.
       bodySizeLimit: "10mb",
     },
+  },
+  // Cross-origin isolation lets in-browser background removal (WebAssembly) use multiple
+  // threads. "credentialless" still allows cross-origin images (Supabase, search
+  // thumbnails) without them sending CORP headers. Browsers without credentialless support
+  // (Safari) simply stay non-isolated and run single-threaded.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "credentialless" },
+        ],
+      },
+    ];
   },
   images: {
     // AVIF is ~20% smaller than WebP for photos; browsers without it get WebP.

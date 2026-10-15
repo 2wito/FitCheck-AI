@@ -24,11 +24,10 @@ export type CanvasTransform = Pick<
   "positionX" | "positionY" | "scale" | "zIndex"
 >;
 
-// Result of AI analysis on an uploaded photo. Either part may be null if that step failed,
-// in which case the user fills in the tags manually or the original photo is used.
+// AI tags for an uploaded photo; null if tagging failed (the user fills them in instead).
+// The background-removed cutout is made in the browser, not returned here.
 export type ClothingAnalysis = {
   tags: ClothingTags | null;
-  cutoutDataUrl: string | null;
 };
 
 // One product photo from online image search.

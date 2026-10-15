@@ -12,7 +12,7 @@
   "dependencies": {
     "@ai-sdk/google": "^4.0.93",
     "@base-ui/react": "^1.9.0",
-    "@imgly/background-removal-node": "^1.4.5",
+    "@imgly/background-removal": "^1.7.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "@supabase/ssr": "^0.12.7",
@@ -44,8 +44,5 @@
     "prisma": "7.10.0",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "overrides": {
-    "sharp": "0.35.5"
   }
 }

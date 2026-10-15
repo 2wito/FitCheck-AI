@@ -15,6 +15,7 @@ FitCheck AI is a Next.js (App Router) application for smart closet management, b
 - **Routing**: Next.js 16 uses `src/proxy.ts` (NOT `middleware.ts`).
 - **Supabase Config**: ALWAYS read environment variables via `src/lib/supabase/config.ts`. Do NOT read `process.env.NEXT_PUBLIC_SUPABASE_URL` directly in client/server code.
 - **Images**: Background removal cutouts MUST be saved as WebP (70–90 KB) to prevent Vercel 4.5 MB request payload limits.
+- **Background removal runs in the browser** (`src/lib/background-removal.ts`, `@imgly/background-removal`). Never add native ML packages (e.g. `onnxruntime-node`, `@imgly/background-removal-node`) to server code: their `.so` binaries fail on Vercel.
 - **AI Limits**: Requests to Gemini are capped at 60s timeout with automatic fallback to `gemini-flash-lite-latest` if quota is hit.
 - **Auth & Demo Mode**: Sign-in is ON by default (`AUTH_ENABLED` in `auth-mode.ts`); every query is scoped to the signed-in user's id. `AUTH_ENABLED="false"` opts into demo mode, where queries fall back to the shared "Dev User".
 

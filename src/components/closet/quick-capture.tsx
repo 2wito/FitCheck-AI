@@ -5,7 +5,8 @@ import { AlertCircle, Camera, Check, Loader2, RotateCcw, X } from "lucide-react"
 
 import { addClothingItem, analyzeClothingImage } from "@/actions/closet";
 import { Button } from "@/components/ui/button";
-import { dataUrlToFile, prepareImage } from "@/lib/image";
+import { preloadBackgroundRemoval, removeBackgroundInBrowser } from "@/lib/background-removal";
+import { prepareImage } from "@/lib/image";
 import { cn } from "@/lib/utils";
 import type { ClothingTags } from "@/types";
 
@@ -75,16 +76,24 @@ export function QuickCapture() {
     update(id, { status: "analyzing" });
     const imageForm = new FormData();
     imageForm.append("image", image);
-    const analysis = await analyzeClothingImage(imageForm).catch(() => null);
-    if (!analysis?.success) return fail(analysis?.error ?? "Couldn't process this photo.");
+    // Tagging (server) and background removal (this device) run in parallel.
+    const [analysis, cutout] = await Promise.all([
+      analyzeClothingImage(imageForm).catch(() => null),
+      removeBackgroundInBrowser(image).catch((error) => {
+        console.warn("Background removal failed", error);
+        return null;
+      }),
+    ]);
+    if (!analysis?.success && !cutout) {
+      return fail(analysis?.error ?? "Couldn't process this photo.");
+    }
+    const aiTags = analysis?.success ? analysis.data.tags : null;
 
     update(id, { status: "saving" });
-    const tags = analysis.data.tags ?? FALLBACK_TAGS;
+    const tags = aiTags ?? FALLBACK_TAGS;
     const saveForm = new FormData();
     saveForm.append("image", image);
-    if (analysis.data.cutoutDataUrl) {
-      saveForm.append("cutout", await dataUrlToFile(analysis.data.cutoutDataUrl, "cutout.webp"));
-    }
+    if (cutout) saveForm.append("cutout", cutout);
     for (const [key, value] of Object.entries({
       ...tags,
       secondaryColor: tags.secondaryColor ?? "",
@@ -95,9 +104,15 @@ export function QuickCapture() {
     if (!saved?.success) return fail(saved?.error ?? "Couldn't save this item.");
 
     files.current.delete(id);
-    update(id, { status: "done", message: saved.data.name, untagged: !analysis.data.tags });
+    update(id, { status: "done", message: saved.data.name, untagged: !aiTags });
     // Tagged items clear themselves; untagged ones stay until dismissed so the hint is seen.
-    if (analysis.data.tags) setTimeout(() => dismiss(id), 4000);
+    if (aiTags) setTimeout(() => dismiss(id), 4000);
+  }
+
+  // Opening the camera also starts the model download, so it overlaps with taking the photo.
+  function openCamera() {
+    preloadBackgroundRemoval();
+    inputRef.current?.click();
   }
 
   function enqueue(id: string) {
@@ -137,13 +152,13 @@ export function QuickCapture() {
       />
 
       {/* Desktop/tablet: inline button. Phones: floating camera button in thumb reach. */}
-      <Button variant="outline" className="max-md:hidden" onClick={() => inputRef.current?.click()}>
+      <Button variant="outline" className="max-md:hidden" onClick={openCamera}>
         <Camera data-icon="inline-start" />
         Snap &amp; save
       </Button>
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={openCamera}
         aria-label="Take a photo and add it to your closet"
         className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95 md:hidden"
       >

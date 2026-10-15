@@ -28,8 +28,9 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/clothing";
+import { preloadBackgroundRemoval, removeBackgroundInBrowser } from "@/lib/background-removal";
 import { dataUrlToFile, prepareImage } from "@/lib/image";
-import type { ClothingAnalysis, ImageSearchResult } from "@/types";
+import type { ClothingTags, ImageSearchResult } from "@/types";
 
 type Upload = {
   file: File;
@@ -40,7 +41,19 @@ type Step =
   | { kind: "select" }
   // previewUrl: a local object URL for uploads, or the result's thumbnail for searches.
   | { kind: "analyzing"; previewUrl: string }
-  | { kind: "review"; upload: Upload; cutoutDataUrl: string | null; aiFailed: boolean };
+  // cutout: background-removed version, or null if that failed (the original is used).
+  | { kind: "review"; upload: Upload; cutout: Upload | null; aiFailed: boolean };
+
+// Background removal in the browser; null on failure so the original photo is used instead.
+async function cutOut(image: Blob): Promise<Upload | null> {
+  try {
+    const file = await removeBackgroundInBrowser(image);
+    return { file, previewUrl: URL.createObjectURL(file) };
+  } catch (error) {
+    console.warn("Background removal failed", error);
+    return null;
+  }
+}
 
 export function UploadDialog() {
   const [open, setOpen] = useState(false);
@@ -51,12 +64,22 @@ export function UploadDialog() {
   const requestId = useRef(0);
 
   const previewUrl =
-    step.kind === "analyzing" ? step.previewUrl : step.kind === "review" ? step.upload.previewUrl : null;
+    step.kind === "analyzing"
+      ? step.previewUrl
+      : step.kind === "review"
+        ? step.upload.previewUrl
+        : null;
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+  const cutoutUrl = step.kind === "review" ? step.cutout?.previewUrl : undefined;
+  useEffect(() => {
+    return () => {
+      if (cutoutUrl) URL.revokeObjectURL(cutoutUrl);
+    };
+  }, [cutoutUrl]);
 
   function reset() {
     requestId.current++;
@@ -83,17 +106,21 @@ export function UploadDialog() {
     const upload = { file: prepared, previewUrl: URL.createObjectURL(prepared) };
     setStep({ kind: "analyzing", previewUrl: upload.previewUrl });
 
+    // Tagging (server) and background removal (this device) run in parallel.
     const formData = new FormData();
     formData.append("image", prepared);
-    const result = await analyzeClothingImage(formData).catch(() => null);
+    const [result, cutout] = await Promise.all([
+      analyzeClothingImage(formData).catch(() => null),
+      cutOut(prepared),
+    ]);
     if (id !== requestId.current) return;
 
-    if (!result?.success) {
-      toast.error(result?.error ?? "Something went wrong. Please try again.");
+    if (!result?.success && !cutout) {
+      toast.error(result?.error ?? "We couldn't process this photo. Please try another one.");
       setStep({ kind: "select" });
       return;
     }
-    showReview(upload, result.data);
+    showReview(upload, result?.success ? result.data.tags : null, cutout);
   }
 
   async function handleSearchResult(result: ImageSearchResult) {
@@ -114,17 +141,28 @@ export function UploadDialog() {
 
     // The server re-encoded the image, so saving goes through the normal upload path.
     const file = await dataUrlToFile(analysis.data.imageDataUrl, "search-result.webp");
+    const cutout = await cutOut(file);
     if (id !== requestId.current) return;
-    showReview({ file, previewUrl: URL.createObjectURL(file) }, analysis.data, result.title);
+    showReview(
+      { file, previewUrl: URL.createObjectURL(file) },
+      analysis.data.tags,
+      cutout,
+      result.title,
+    );
   }
 
-  function showReview(upload: Upload, { tags, cutoutDataUrl }: ClothingAnalysis, fallbackName = "") {
+  function showReview(
+    upload: Upload,
+    tags: ClothingTags | null,
+    cutout: Upload | null,
+    fallbackName = "",
+  ) {
     setForm(
       tags
         ? { ...tags, secondaryColor: tags.secondaryColor ?? "" }
         : { ...EMPTY_CLOTHING_FORM, name: fallbackName.slice(0, 80) },
     );
-    setStep({ kind: "review", upload, cutoutDataUrl, aiFailed: !tags });
+    setStep({ kind: "review", upload, cutout, aiFailed: !tags });
   }
 
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
@@ -134,9 +172,7 @@ export function UploadDialog() {
     startSaving(async () => {
       const formData = new FormData();
       formData.append("image", step.upload.file);
-      if (step.cutoutDataUrl) {
-        formData.append("cutout", await dataUrlToFile(step.cutoutDataUrl, "cutout.webp"));
-      }
+      if (step.cutout) formData.append("cutout", step.cutout.file);
       for (const [key, value] of Object.entries(form)) formData.append(key, value);
 
       const result = await addClothingItem(formData).catch(() => null);
@@ -153,7 +189,9 @@ export function UploadDialog() {
   function handleOpenChange(nextOpen: boolean) {
     if (isSaving) return;
     setOpen(nextOpen);
-    if (!nextOpen) reset();
+    // Start downloading the background-removal model while the user picks a photo.
+    if (nextOpen) preloadBackgroundRemoval();
+    else reset();
   }
 
   return (
@@ -204,8 +242,8 @@ export function UploadDialog() {
         {step.kind === "review" && (
           <form id="clothing-form" onSubmit={handleSave} className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <ImagePreview src={step.cutoutDataUrl ?? step.upload.previewUrl} />
-              {!step.cutoutDataUrl && (
+              <ImagePreview src={step.cutout?.previewUrl ?? step.upload.previewUrl} />
+              {!step.cutout && (
                 <Notice>Background removal failed, so the original photo will be used.</Notice>
               )}
             </div>
@@ -241,7 +279,6 @@ export function UploadDialog() {
   );
 }
 
-
 function ImagePreview({ src, analyzing = false }: { src: string; analyzing?: boolean }) {
   return (
     <div className="relative aspect-square overflow-hidden rounded-xl bg-checkerboard">
@@ -257,8 +294,6 @@ function ImagePreview({ src, analyzing = false }: { src: string; analyzing?: boo
     </div>
   );
 }
-
-
 
 function Notice({ children }: { children: React.ReactNode }) {
   return (
