@@ -37,6 +37,8 @@ export type ImageSearchResult = {
   thumbnailUrl: string;
   title: string;
   source: string;
+  // Page the image came from (e.g. the product page), when the provider returns it.
+  link: string | null;
 };
 
 // Analysis of a search result: also returns the downloaded image (re-encoded as WebP),
@@ -62,8 +64,31 @@ export type MatchScore = {
   source: "ai" | "estimate" | "saved";
 };
 
-// A closet item plus how many saved outfits use it (shown when deleting).
-export type ClosetItem = ClothingItem & { _count: { outfitItems: number } };
+// How often and how recently an item was worn (from OutfitWear). lastWornAt is "YYYY-MM-DD".
+export type WearStats = { count: number; lastWornAt: string | null };
+
+// A closet item plus how many saved outfits use it (shown when deleting) and its wear stats.
+export type ClosetItem = ClothingItem & {
+  _count: { outfitItems: number };
+  wear: WearStats;
+};
+
+// Current local weather (Open-Meteo), used for "Today's look" and the AI stylist.
+export type Weather = {
+  temperatureC: number;
+  feelsLikeC: number;
+  highC: number;
+  lowC: number;
+  // Highest hourly chance of rain today, 0-100.
+  precipitationChance: number;
+  code: number;
+  condition: string;
+  isRaining: boolean;
+  isSnowing: boolean;
+  isDay: boolean;
+  // City from the request's IP geolocation, when known.
+  place: string | null;
+};
 
 // Uniform return shape for Server Actions, so forms can render errors without try/catch.
 export type ActionResult<T = void> =

@@ -38,6 +38,8 @@ model User {
 
   clothingItems ClothingItem[]
   outfits       Outfit[]
+  outfitPlans   OutfitPlan[]
+  outfitWears   OutfitWear[]
 
   @@map("users")
 }
@@ -58,6 +60,7 @@ model ClothingItem {
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   outfitItems OutfitItem[]
+  wears       OutfitWear[]
 
   @@index([userId, category])
   @@map("clothing_items")
@@ -79,6 +82,8 @@ model Outfit {
 
   user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   items OutfitItem[]
+  plans OutfitPlan[]
+  wears OutfitWear[]
 
   @@index([userId, isFavorite])
   @@map("outfits")
@@ -101,4 +106,43 @@ model OutfitItem {
   @@unique([outfitId, clothingItemId])
   @@index([clothingItemId])
   @@map("outfit_items")
+}
+
+// An outfit planned for a calendar day (one per user per day). Planning is not wearing:
+// wear is only recorded when the user marks it worn (see OutfitWear).
+model OutfitPlan {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  outfitId  String   @db.Uuid
+  // Calendar day in the user's local time zone, stored as a plain date.
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfit Outfit @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([outfitId])
+  @@map("outfit_plans")
+}
+
+// One clothing item worn on one day, optionally as part of an outfit. Drives the "last worn"
+// and "wear count" badges and lets the AI stylist avoid recently worn pieces.
+model OutfitWear {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  outfitId       String?  @db.Uuid
+  clothingItemId String   @db.Uuid
+  wornAt         DateTime @db.Date
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outfit       Outfit?      @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+  clothingItem ClothingItem @relation(fields: [clothingItemId], references: [id], onDelete: Cascade)
+
+  // An item counts once per day, however many times it's marked.
+  @@unique([userId, clothingItemId, wornAt])
+  @@index([userId, wornAt])
+  @@index([outfitId])
+  @@map("outfit_wears")
 }

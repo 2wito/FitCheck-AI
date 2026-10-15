@@ -1,17 +1,22 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   BringToFront,
+  Download,
   Eraser,
   LayoutGrid,
+  Loader2,
   Minus,
   Plus,
+  Redo2,
   SendToBack,
+  Share2,
   Sparkles,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,11 +24,14 @@ import { saveOutfit, scoreOutfit } from "@/actions/outfits";
 import { AiStylistDialog } from "@/components/outfits/ai-stylist-dialog";
 import { BackdropPicker } from "@/components/outfits/backdrop-picker";
 import { ClosetDrawer, DRAG_MIME } from "@/components/outfits/closet-drawer";
+import { CompleteTheLook } from "@/components/outfits/complete-the-look";
 import { MatchScorePanel } from "@/components/outfits/match-score";
 import { SaveOutfitDialog, type OutfitDetails } from "@/components/outfits/save-outfit-dialog";
 import { Button } from "@/components/ui/button";
+import { useHistoryState } from "@/hooks/use-history";
 import { DEFAULT_BACKDROP, getBackdrop, type BackdropId } from "@/lib/backdrops";
 import type { Occasion } from "@/lib/clothing";
+import { completeTheLook } from "@/lib/complete-look";
 import {
   autoLayout,
   clamp,
@@ -35,6 +43,7 @@ import {
   slotFor,
   topZIndex,
 } from "@/lib/outfit-layout";
+import { renderOutfitImage } from "@/lib/outfit-snapshot";
 import { cn } from "@/lib/utils";
 import { MAX_OUTFIT_ITEMS } from "@/lib/validations/outfit";
 import type { CanvasItem, ClothingItem, MatchScore, StylistSuggestion } from "@/types";
@@ -58,12 +67,12 @@ const SCALE_STEP = 1.1;
 export function OutfitCanvas({
   closetItems,
   initialOutfit,
-  initialAddId,
+  initialAddIds,
 }: {
   closetItems: ClothingItem[];
   initialOutfit: InitialOutfit | null;
-  // From the closet's "Send to canvas" action (?add=<itemId>).
-  initialAddId: string | null;
+  // Pieces to place on load: closet "Send to canvas" or "Today's look" (?add=<id>,<id>).
+  initialAddIds: string[];
 }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -72,18 +81,39 @@ export function OutfitCanvas({
     [closetItems],
   );
 
-  const [items, setItems] = useState<CanvasItem[]>(() => {
+  const history = useHistoryState<CanvasItem[]>(() => {
     const initial = (initialOutfit?.items ?? []).filter((item) =>
       closetById.has(item.clothingItemId),
     );
-    const added = initialAddId ? closetById.get(initialAddId) : undefined;
-    if (!added || initial.some((item) => item.clothingItemId === added.id)) return initial;
-    const slot = slotFor(
-      added.category,
-      initial.map((item) => closetById.get(item.clothingItemId)!.category),
+    const added = initialAddIds.flatMap((id) => {
+      const clothing = closetById.get(id);
+      return clothing && !initial.some((item) => item.clothingItemId === id) ? [clothing] : [];
+    });
+    if (added.length === 0) return initial;
+    // A fresh canvas gets a neat layout; an existing outfit gets the new pieces in free slots.
+    if (initial.length === 0) {
+      return autoLayout(
+        added.map((clothing) => ({ id: clothing.id, category: clothing.category })),
+      );
+    }
+    return added.reduce<CanvasItem[]>(
+      (list, clothing) => [
+        ...list,
+        {
+          clothingItemId: clothing.id,
+          ...slotFor(
+            clothing.category,
+            list.map((item) => closetById.get(item.clothingItemId)!.category),
+          ),
+          zIndex: topZIndex(list) + 1,
+        },
+      ],
+      initial,
     );
-    return [...initial, { clothingItemId: added.id, ...slot, zIndex: topZIndex(initial) + 1 }];
   });
+  const items = history.value;
+  const setItems = history.set;
+  const { undo, redo } = history;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [outfitId, setOutfitId] = useState(initialOutfit?.id ?? null);
   const [details, setDetails] = useState<OutfitDetails>({
@@ -185,6 +215,34 @@ export function OutfitCanvas({
     setDetails({ name: suggestion.name, occasion });
   }
 
+  function swapItem(oldId: string, newId: string) {
+    setItems((current) =>
+      current.map((item) =>
+        item.clothingItemId === oldId ? { ...item, clothingItemId: newId } : item,
+      ),
+    );
+    setSelectedId(newId);
+  }
+
+  // Ctrl/Cmd+Z = undo, Ctrl+Y or Ctrl/Cmd+Shift+Z = redo. Ignored while typing in a field.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+      } else if (key === "y" || (key === "z" && event.shiftKey)) {
+        event.preventDefault();
+        redo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo]);
+
   function checkMatch() {
     const ids = items.map((item) => item.clothingItemId);
     startScoring(async () => {
@@ -271,6 +329,11 @@ export function OutfitCanvas({
   const selected = items.find((item) => item.clothingItemId === selectedId) ?? null;
   const maxZ = topZIndex(items);
   const scene = getBackdrop(backdrop);
+  const outfitPieces = items.flatMap((item) => closetById.get(item.clothingItemId) ?? []);
+  const completion = completeTheLook(outfitPieces, closetItems);
+  const showCompletion =
+    items.length > 0 &&
+    (completion.missing.length > 0 || (match !== null && !matchIsStale && match.value.score < 70));
 
   return (
     <div className="flex flex-col gap-6">
@@ -288,6 +351,20 @@ export function OutfitCanvas({
             canvasHasItems={items.length > 0}
             disabled={closetItems.length < 2}
             onGenerated={applySuggestion}
+          />
+          <SnapshotButtons
+            disabled={items.length === 0}
+            fileName={details.name || "fitcheck-outfit"}
+            render={() =>
+              renderOutfitImage({
+                items,
+                backdrop: scene,
+                imageFor: (id) => {
+                  const clothing = closetById.get(id)!;
+                  return clothing.bgRemovedUrl ?? clothing.imageUrl;
+                },
+              })
+            }
           />
           <SaveOutfitDialog
             defaults={details}
@@ -317,6 +394,13 @@ export function OutfitCanvas({
             aria-label="Canvas tools"
           >
             <div className="flex items-center gap-1">
+              <ToolButton label="Undo (Ctrl+Z)" disabled={!history.canUndo} onClick={undo}>
+                <Undo2 />
+              </ToolButton>
+              <ToolButton label="Redo (Ctrl+Y)" disabled={!history.canRedo} onClick={redo}>
+                <Redo2 />
+              </ToolButton>
+              <span className="mx-1 h-5 w-px bg-border" aria-hidden />
               <ToolButton
                 label="Bring forward ( ] )"
                 disabled={!selected || selected.zIndex >= maxZ}
@@ -415,6 +499,8 @@ export function OutfitCanvas({
                 canvasRef={canvasRef}
                 onSelect={() => setSelectedId(item.clothingItemId)}
                 onChange={(patch) => updateItem(item.clothingItemId, patch)}
+                onGestureStart={history.beginGesture}
+                onGestureEnd={history.endGesture}
                 onKeyDown={(e) => handleItemKeyDown(item.clothingItemId, e)}
               />
             ))}
@@ -434,6 +520,15 @@ export function OutfitCanvas({
             canScore={items.length >= 2}
             onCheck={checkMatch}
           />
+
+          {showCompletion && (
+            <CompleteTheLook
+              completion={completion}
+              outfit={outfitPieces}
+              onAdd={(id) => addItem(id)}
+              onSwap={swapItem}
+            />
+          )}
         </section>
       </div>
     </div>
@@ -451,6 +546,8 @@ function CanvasItemView({
   canvasRef,
   onSelect,
   onChange,
+  onGestureStart,
+  onGestureEnd,
   onKeyDown,
 }: {
   item: CanvasItem;
@@ -459,6 +556,9 @@ function CanvasItemView({
   canvasRef: React.RefObject<HTMLDivElement | null>;
   onSelect: () => void;
   onChange: (patch: Partial<CanvasItem>) => void;
+  // A whole drag or resize is recorded as one undo step.
+  onGestureStart: () => void;
+  onGestureEnd: () => void;
   onKeyDown: (event: React.KeyboardEvent) => void;
 }) {
   const gesture = useRef<Gesture | null>(null);
@@ -467,6 +567,7 @@ function CanvasItemView({
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     onSelect();
+    onGestureStart();
     gesture.current = {
       kind: "move",
       startX: event.clientX,
@@ -483,6 +584,7 @@ function CanvasItemView({
     const rect = canvasRef.current!.getBoundingClientRect();
     const centerX = rect.left + item.positionX * rect.width;
     const centerY = rect.top + item.positionY * rect.height;
+    onGestureStart();
     gesture.current = {
       kind: "resize",
       centerX,
@@ -510,7 +612,9 @@ function CanvasItemView({
   }
 
   function endGesture() {
+    if (!gesture.current) return;
     gesture.current = null;
+    onGestureEnd();
   }
 
   return (
@@ -572,5 +676,85 @@ function ToolButton({
     >
       {children}
     </Button>
+  );
+}
+
+function SnapshotButtons({
+  disabled,
+  fileName,
+  render,
+}: {
+  disabled: boolean;
+  fileName: string;
+  render: () => Promise<Blob>;
+}) {
+  const [isRendering, startRendering] = useTransition();
+  const slug = fileName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const name = `${slug || "fitcheck-outfit"}.png`;
+
+  function download(blob: Blob) {
+    const url = URL.createObjectURL(blob);
+    const link = Object.assign(document.createElement("a"), { href: url, download: name });
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  }
+
+  function run(mode: "download" | "share") {
+    startRendering(async () => {
+      let blob: Blob;
+      try {
+        blob = await render();
+      } catch (error) {
+        console.error(error);
+        toast.error("Couldn't create the image. Please try again.");
+        return;
+      }
+
+      const file = new File([blob], name, { type: "image/png" });
+      if (mode === "share" && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: fileName,
+            text: "My outfit, styled with FitCheck AI",
+          });
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return; // user cancelled
+        }
+      }
+      download(blob);
+      if (mode === "share")
+        toast.info("Sharing isn't supported here, so the image was downloaded instead.");
+    });
+  }
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="icon"
+        aria-label="Download image"
+        title="Download image"
+        disabled={disabled || isRendering}
+        onClick={() => run("download")}
+      >
+        {isRendering ? <Loader2 className="animate-spin" /> : <Download />}
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        aria-label="Share"
+        title="Share (WhatsApp, Instagram…)"
+        disabled={disabled || isRendering}
+        onClick={() => run("share")}
+      >
+        <Share2 />
+      </Button>
+    </>
   );
 }

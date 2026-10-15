@@ -6,7 +6,8 @@ import { z } from "zod";
 import { Category, type Season } from "@/generated/prisma/browser";
 import { withModelFallback } from "@/lib/ai/model";
 import { SEASON_LABELS, type Occasion } from "@/lib/clothing";
-import type { ClothingItem, StylistSuggestion } from "@/types";
+import { weatherForPrompt } from "@/lib/weather-format";
+import type { ClothingItem, StylistSuggestion, Weather } from "@/types";
 
 export type StylistItem = Pick<
   ClothingItem,
@@ -30,7 +31,8 @@ Rules:
 - A complete outfit has one top, one bottom and one pair of shoes, whenever the closet has them.
 - Add outerwear only when the season or occasion calls for it. Add at most two accessories, only if they elevate the look.
 - Match the occasion: the items' styles should suit it and work together.
-- Respect the season: ALL_WEATHER items suit any season; avoid heavy pieces in summer and light-only looks in winter.
+- Dress for today's weather when it's given (otherwise respect the season): ALL_WEATHER items suit any weather; avoid heavy pieces when it's hot and light-only looks when it's cold.
+- Variety: avoid items marked "worn N days ago" (worn in the last week) unless there's no reasonable alternative.
 - Use color harmony: build around neutrals with at most one or two accent colors, pair complementary or analogous tones, and avoid clashing colors.
 - Never pick two items that do the same job (e.g. two pairs of shoes).
 
@@ -48,10 +50,16 @@ export async function generateOutfit({
   items,
   occasion,
   season,
+  weather,
+  recentlyWorn = new Map(),
 }: {
   items: StylistItem[];
   occasion: Occasion;
   season: Season | null;
+  // Today's weather; replaces the season when present.
+  weather?: Weather | null;
+  // Item id -> days since last worn, for items worn in the last week.
+  recentlyWorn?: Map<string, number>;
 }): Promise<StylistSuggestion> {
   // Short refs instead of UUIDs: fewer tokens, and the enum makes it impossible for the
   // model to return an item that isn't in the closet.
@@ -60,13 +68,19 @@ export async function generateOutfit({
 
   const closet = items
     .map((item, index) => {
-      const colors = [item.color, item.secondaryColor].filter(Boolean).join(" + ") || "unknown";
-      return `${refs[index]} | ${item.category} | "${item.name}" | colors: ${colors} | season: ${item.season} | style: ${item.style ?? "unspecified"}`;
+      const daysAgo = recentlyWorn.get(item.id);
+      const worn =
+        daysAgo === undefined ? "" : ` | worn ${daysAgo === 0 ? "today" : `${daysAgo} days ago`}`;
+      return describeItem(item, refs[index]) + worn;
     })
     .join("\n");
 
+  const conditions = weather
+    ? `Today's weather: ${weatherForPrompt(weather)}`
+    : `Season: ${season ? SEASON_LABELS[season] : "any (not specified)"}`;
+
   const request = `Occasion: ${occasion}
-Season: ${season ? SEASON_LABELS[season] : "any (not specified)"}
+${conditions}
 
 Closet:
 ${closet}`;
@@ -79,7 +93,10 @@ ${closet}`;
       instructions: INSTRUCTIONS,
       output: Output.object({
         schema: z.object({
-          itemRefs: z.array(z.enum(refs as [string, ...string[]])).min(1).max(7),
+          itemRefs: z
+            .array(z.enum(refs as [string, ...string[]]))
+            .min(1)
+            .max(7),
           name: z.string().describe("Short catchy outfit name, max 5 words"),
           reasoning: z.string().describe("One or two sentences on why the pieces work together"),
           score: z.int().min(0).max(100).describe("Color & style match score, 0-100"),

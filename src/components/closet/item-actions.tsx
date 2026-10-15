@@ -1,8 +1,12 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
-import { Palette, Tag, Trash2 } from "lucide-react";
+import { CalendarCheck, Loader2, Palette, Tag, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
+import { markItemsWorn, unmarkItemWorn } from "@/actions/wear";
+import { todayKey } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { ClosetItem } from "@/types";
 
@@ -19,6 +23,26 @@ export function ItemQuickActions({
   onDelete: (item: ClosetItem) => void;
   className?: string;
 }) {
+  const [isLogging, startLogging] = useTransition();
+  const wornToday = item.wear.lastWornAt === todayKey();
+
+  function logWornToday() {
+    const date = todayKey();
+    startLogging(async () => {
+      const result = await markItemsWorn({ clothingItemIds: [item.id], date }).catch(() => null);
+      if (!result?.success) {
+        toast.error(result?.error ?? "Couldn't log that. Please try again.");
+        return;
+      }
+      toast.success(`Logged "${item.name}" as worn today`, {
+        action: {
+          label: "Undo",
+          onClick: () => void unmarkItemWorn({ clothingItemId: item.id, date }),
+        },
+      });
+    });
+  }
+
   return (
     <div
       className={cn(
@@ -26,11 +50,30 @@ export function ItemQuickActions({
         className,
       )}
     >
-      <ActionButton label={`Delete ${item.name}`} onClick={() => onDelete(item)} destructive>
+      <ActionButton
+        label={`Delete ${item.name}`}
+        tooltip="Delete"
+        onClick={() => onDelete(item)}
+        destructive
+      >
         <Trash2 />
       </ActionButton>
-      <ActionButton label={`Edit tags for ${item.name}`} onClick={() => onEdit(item)}>
+      <ActionButton
+        label={`Edit tags for ${item.name}`}
+        tooltip="Edit tags"
+        onClick={() => onEdit(item)}
+      >
         <Tag />
+      </ActionButton>
+      <ActionButton
+        label={
+          wornToday ? `${item.name} is logged as worn today` : `Mark ${item.name} as worn today`
+        }
+        tooltip={wornToday ? "Worn today ✓" : "Worn today"}
+        onClick={logWornToday}
+        disabled={isLogging || wornToday}
+      >
+        {isLogging ? <Loader2 className="animate-spin" /> : <CalendarCheck />}
       </ActionButton>
       <Link
         href={`/outfits/builder?add=${item.id}`}
@@ -49,25 +92,31 @@ function buttonClasses(destructive = false) {
     "flex size-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm ring-1 ring-foreground/10 backdrop-blur transition-colors [&_svg]:size-4",
     "hover:bg-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
     destructive && "hover:text-destructive",
+    "disabled:opacity-60",
   );
 }
 
 function ActionButton({
   label,
+  tooltip,
   onClick,
   destructive,
+  disabled,
   children,
 }: {
   label: string;
+  tooltip: string;
   onClick: () => void;
   destructive?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       aria-label={label}
-      title={label.split(" ").slice(0, 2).join(" ")}
+      title={tooltip}
       onClick={(e) => {
         e.stopPropagation();
         onClick();

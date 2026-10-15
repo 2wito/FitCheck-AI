@@ -40,9 +40,28 @@ export const saveOutfitSchema = z.object({
 
 export type SaveOutfitInput = z.infer<typeof saveOutfitSchema>;
 
+// Weather as fetched by getWeather; validated because it arrives from the browser.
+export const weatherSchema = z.object({
+  temperatureC: z.number().min(-90).max(70),
+  feelsLikeC: z.number().min(-90).max(80),
+  highC: z.number().min(-90).max(70),
+  lowC: z.number().min(-90).max(70),
+  precipitationChance: z.number().min(0).max(100),
+  code: z.int().min(0).max(99),
+  condition: z.string().max(40),
+  isRaining: z.boolean(),
+  isSnowing: z.boolean(),
+  isDay: z.boolean(),
+  place: z.string().max(80).nullable(),
+});
+
 export const generateOutfitSchema = z.object({
   occasion: z.enum(OCCASIONS),
   season: z.enum(Season).nullable(),
+  // When present, used instead of the season.
+  weather: weatherSchema.nullable().optional(),
+  // The browser's local date, for "worn in the last 7 days".
+  today: z.iso.date().optional(),
 });
 
 export type GenerateOutfitInput = z.infer<typeof generateOutfitSchema>;

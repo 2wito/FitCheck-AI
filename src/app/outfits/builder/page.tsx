@@ -25,11 +25,13 @@ export default function BuilderPage({ searchParams }: PageProps<"/outfits/builde
 }
 
 // `?id=<outfitId>` opens a saved outfit for editing; no id starts a new one.
-// `?add=<itemId>` (closet "Send to canvas") places that item on the canvas.
+// `?add=<itemId>[,<itemId>…]` (closet "Send to canvas", "Today's look") places those items.
 async function Builder({ searchParams }: Pick<PageProps<"/outfits/builder">, "searchParams">) {
   const { id, add } = await searchParams;
   const outfitId = typeof id === "string" ? id : null;
-  const addId = typeof add === "string" && z.uuid().safeParse(add).success ? add : null;
+  const addIds = (typeof add === "string" ? add.split(",") : [])
+    .filter((value) => z.uuid().safeParse(value).success)
+    .slice(0, 20);
   if (outfitId && !z.uuid().safeParse(outfitId).success) notFound();
 
   const userId = await requireUserId();
@@ -55,7 +57,9 @@ async function Builder({ searchParams }: Pick<PageProps<"/outfits/builder">, "se
       scale,
       zIndex,
     })),
-    backdrop: BACKDROP_IDS.includes(outfit.backdrop as BackdropId) ? (outfit.backdrop as BackdropId) : null,
+    backdrop: BACKDROP_IDS.includes(outfit.backdrop as BackdropId)
+      ? (outfit.backdrop as BackdropId)
+      : null,
     match:
       outfit.matchScore !== null
         ? { score: outfit.matchScore, summary: outfit.matchSummary ?? "" }
@@ -64,10 +68,10 @@ async function Builder({ searchParams }: Pick<PageProps<"/outfits/builder">, "se
 
   return (
     <OutfitCanvas
-      key={`${outfit?.id ?? "new"}:${addId ?? ""}`}
+      key={`${outfit?.id ?? "new"}:${addIds.join(",")}`}
       closetItems={closetItems}
       initialOutfit={initialOutfit}
-      initialAddId={addId}
+      initialAddIds={addIds}
     />
   );
 }

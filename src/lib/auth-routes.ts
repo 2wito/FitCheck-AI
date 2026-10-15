@@ -3,7 +3,7 @@
 export const LOGIN_PATH = "/login";
 export const DEFAULT_AUTHED_PATH = "/closet";
 
-const PROTECTED_PREFIXES = ["/closet", "/outfits"];
+const PROTECTED_PREFIXES = ["/closet", "/outfits", "/planner"];
 
 export function isProtectedPath(pathname: string) {
   return PROTECTED_PREFIXES.some(

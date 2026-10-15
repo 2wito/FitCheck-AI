@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { Shirt } from "lucide-react";
+import { CalendarCheck, Shirt } from "lucide-react";
 
 import { ItemQuickActions } from "@/components/closet/item-actions";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_LABELS, SEASON_LABELS } from "@/lib/clothing";
-import type { ClosetItem } from "@/types";
+import { formatLastWorn } from "@/lib/dates";
+import { cn } from "@/lib/utils";
+import type { ClosetItem, WearStats } from "@/types";
 
 const MASONRY_CLASSES = "columns-2 gap-4 sm:columns-3 lg:columns-4 xl:columns-5";
 
@@ -65,6 +67,7 @@ function ClothingCard({
       <div className="flex flex-col gap-1 px-0.5">
         <h3 className="truncate text-sm font-medium">{item.name}</h3>
         {colors && <p className="truncate text-xs text-muted-foreground capitalize">{colors}</p>}
+        <WearBadge wear={item.wear} />
         <div className="flex flex-wrap gap-1">
           <Badge variant="secondary">{CATEGORY_LABELS[item.category]}</Badge>
           <Badge variant="outline">{SEASON_LABELS[item.season]}</Badge>
@@ -76,6 +79,22 @@ function ClothingCard({
         </div>
       </div>
     </article>
+  );
+}
+
+// "Worn 4× · last 2 days ago" / "Not worn yet".
+export function WearBadge({ wear, className }: { wear: WearStats; className?: string }) {
+  return (
+    <p
+      className={cn("flex items-center gap-1 text-xs text-muted-foreground", className)}
+      // "Last worn" depends on the viewer's local date, which can differ from the server's.
+      suppressHydrationWarning
+    >
+      <CalendarCheck className="size-3 shrink-0" />
+      {wear.count === 0 || !wear.lastWornAt
+        ? "Not worn yet"
+        : `Worn ${wear.count}× · last ${formatLastWorn(wear.lastWornAt)}`}
+    </p>
   );
 }
 

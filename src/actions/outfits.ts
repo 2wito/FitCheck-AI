@@ -7,6 +7,7 @@ import { scoreOutfitWithAI } from "@/lib/ai/match";
 import { generateOutfit } from "@/lib/ai/stylist";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
 import { AUTH_ENABLED } from "@/lib/auth-mode";
+import { addDays, daysBetween, dbDateToKey, keyToDbDate, todayKey } from "@/lib/dates";
 import { estimateMatch } from "@/lib/match-score";
 import { prisma } from "@/lib/prisma";
 import {
@@ -25,9 +26,7 @@ const USER_UNAVAILABLE = AUTH_ENABLED
   ? NOT_SIGNED_IN
   : ({ success: false, error: "Couldn't reach the database. Please try again." } as const);
 
-export async function saveOutfit(
-  input: SaveOutfitInput,
-): Promise<ActionResult<{ id: string }>> {
+export async function saveOutfit(input: SaveOutfitInput): Promise<ActionResult<{ id: string }>> {
   const parsed = saveOutfitSchema.safeParse(input);
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid outfit" };
@@ -123,8 +122,33 @@ export async function generateOutfitWithAI(
     return { success: false, error: "Add at least two items to your closet first" };
   }
 
+  // Variety: leave out pieces worn in the last 7 days, as long as enough remain to build an
+  // outfit (same categories still covered). Otherwise keep them, marked, and let the prompt
+  // steer the model away from them.
+  const today = parsed.data.today ?? todayKey();
+  const wears = await prisma.outfitWear.findMany({
+    where: { userId, wornAt: { gte: keyToDbDate(addDays(today, -7)) } },
+    select: { clothingItemId: true, wornAt: true },
+  });
+  const recentlyWorn = new Map<string, number>();
+  for (const wear of wears) {
+    const daysAgo = daysBetween(dbDateToKey(wear.wornAt), today);
+    const known = recentlyWorn.get(wear.clothingItemId);
+    if (known === undefined || daysAgo < known) recentlyWorn.set(wear.clothingItemId, daysAgo);
+  }
+  const fresh = items.filter((item) => !recentlyWorn.has(item.id));
+  const categoriesOf = (list: typeof items) => new Set(list.map((item) => item.category)).size;
+  const candidates =
+    fresh.length >= 2 && categoriesOf(fresh) === categoriesOf(items) ? fresh : items;
+
   try {
-    const suggestion = await generateOutfit({ items, ...parsed.data });
+    const suggestion = await generateOutfit({
+      items: candidates,
+      occasion: parsed.data.occasion,
+      season: parsed.data.season,
+      weather: parsed.data.weather,
+      recentlyWorn,
+    });
     if (suggestion.itemIds.length === 0) {
       return { success: false, error: "The stylist couldn't find a match. Try another occasion." };
     }
@@ -148,7 +172,14 @@ export async function scoreOutfit(input: ScoreOutfitInput): Promise<ActionResult
 
   const items = await prisma.clothingItem.findMany({
     where: { userId, id: { in: parsed.data.clothingItemIds } },
-    select: { name: true, category: true, color: true, secondaryColor: true, season: true, style: true },
+    select: {
+      name: true,
+      category: true,
+      color: true,
+      secondaryColor: true,
+      season: true,
+      style: true,
+    },
   });
   if (items.length !== parsed.data.clothingItemIds.length) {
     return { success: false, error: "Some items are no longer in your closet" };
@@ -158,7 +189,10 @@ export async function scoreOutfit(input: ScoreOutfitInput): Promise<ActionResult
     const result = await scoreOutfitWithAI(items, parsed.data.occasion);
     return { success: true, data: { ...result, source: "ai" } };
   } catch (error) {
-    console.warn("AI match score unavailable, using estimate:", error instanceof Error ? error.message : error);
+    console.warn(
+      "AI match score unavailable, using estimate:",
+      error instanceof Error ? error.message : error,
+    );
     return { success: true, data: { ...estimateMatch(items), source: "estimate" } };
   }
 }

@@ -18,6 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import type { Season } from "@/generated/prisma/browser";
 import { OCCASIONS, SEASON_LABELS, capitalize, type Occasion } from "@/lib/clothing";
+import { WeatherSummary } from "@/components/shared/weather-summary";
+import { useWeather } from "@/hooks/use-weather";
+import { todayKey } from "@/lib/dates";
 import type { StylistSuggestion } from "@/types";
 
 const ANY_SEASON = "ANY";
@@ -41,12 +44,18 @@ export function AiStylistDialog({
   const [occasion, setOccasion] = useState<Occasion>("casual");
   const [season, setSeason] = useState(ANY_SEASON);
   const [isGenerating, startGenerating] = useTransition();
+  // Today's weather replaces the manual season when it's available and enabled.
+  const { state: weatherState, requestLocation } = useWeather(open);
+  const [dressForWeather, setDressForWeather] = useState(true);
+  const weather = weatherState.status === "ready" && dressForWeather ? weatherState.weather : null;
 
   function generate() {
     startGenerating(async () => {
       const result = await generateOutfitWithAI({
         occasion,
-        season: season === ANY_SEASON ? null : (season as Season),
+        season: weather || season === ANY_SEASON ? null : (season as Season),
+        weather,
+        today: todayKey(),
       }).catch(() => null);
 
       if (!result?.success) {
@@ -82,16 +91,36 @@ export function AiStylistDialog({
               disabled={isGenerating}
             />
           </Field>
-          <Field label="Season">
-            <OptionSelect
-              label="Season"
-              items={seasonItems}
-              value={season}
-              onChange={setSeason}
-              disabled={isGenerating}
-            />
-          </Field>
+          {!weather && (
+            <Field label="Season">
+              <OptionSelect
+                label="Season"
+                items={seasonItems}
+                value={season}
+                onChange={setSeason}
+                disabled={isGenerating}
+              />
+            </Field>
+          )}
         </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border p-3">
+          <WeatherSummary state={weatherState} onRequestLocation={requestLocation} />
+          {weatherState.status === "ready" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={dressForWeather}
+                onChange={(e) => setDressForWeather(e.target.checked)}
+                className="size-4 accent-foreground"
+              />
+              Dress for today&apos;s weather
+            </label>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Pieces you wore in the last 7 days are avoided, so your looks stay fresh.
+        </p>
 
         {canvasHasItems && (
           <p className="text-muted-foreground">This replaces the items currently on your canvas.</p>

@@ -34,10 +34,10 @@ export function BackdropPicker({
               aria-label={backdrop.label}
               title={backdrop.label}
               onClick={() => onChange(backdrop.id)}
-              style={"style" in backdrop ? backdrop.style : undefined}
+              style={backdrop.style}
               className={cn(
                 "size-7 rounded-full ring-1 ring-foreground/15 ring-offset-2 ring-offset-background transition-shadow",
-                "className" in backdrop && backdrop.className,
+                backdrop.className,
                 value === backdrop.id ? "ring-2 ring-foreground" : "hover:ring-foreground/40",
               )}
             />

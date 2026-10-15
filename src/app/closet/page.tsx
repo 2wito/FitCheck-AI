@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 
 import { ClothingGridSkeleton } from "@/components/closet/clothing-grid";
 import { ClosetView } from "@/components/closet/closet-view";
+import { TodaysLook } from "@/components/closet/todays-look";
 import { UploadDialog } from "@/components/closet/upload-dialog";
 import { requireUserId } from "@/lib/auth";
+import { dbDateToKey } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
@@ -23,6 +25,7 @@ export default function ClosetPage() {
       </header>
 
       <Suspense fallback={<ClothingGridSkeleton />}>
+        {/* Today's look + the closet grid share one data fetch. */}
         <ClosetItems />
       </Suspense>
     </main>
@@ -33,12 +36,36 @@ export default function ClosetPage() {
 async function ClosetItems() {
   const userId = await requireUserId();
 
-  const items = await prisma.clothingItem.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    // Outfit count is shown when deleting an item that saved outfits use.
-    include: { _count: { select: { outfitItems: true } } },
-  });
+  const [items, wearStats] = await Promise.all([
+    prisma.clothingItem.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      // Outfit count is shown when deleting an item that saved outfits use.
+      include: { _count: { select: { outfitItems: true } } },
+    }),
+    prisma.outfitWear.groupBy({
+      by: ["clothingItemId"],
+      where: { userId },
+      _count: { _all: true },
+      _max: { wornAt: true },
+    }),
+  ]);
 
-  return <ClosetView items={items} />;
+  const statsById = new Map(
+    wearStats.map((s) => [
+      s.clothingItemId,
+      { count: s._count._all, lastWornAt: s._max.wornAt ? dbDateToKey(s._max.wornAt) : null },
+    ]),
+  );
+  const closet = items.map((item) => ({
+    ...item,
+    wear: statsById.get(item.id) ?? { count: 0, lastWornAt: null },
+  }));
+
+  return (
+    <>
+      {closet.length >= 2 && <TodaysLook closetItems={closet} />}
+      <ClosetView items={closet} />
+    </>
+  );
 }

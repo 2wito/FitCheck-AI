@@ -20,6 +20,7 @@ const serperResponseSchema = z.object({
         title: z.string().optional(),
         source: z.string().optional(),
         domain: z.string().optional(),
+        link: z.string().optional(),
       }),
     )
     .default([]),
@@ -60,6 +61,7 @@ export async function searchProductImages(query: string, limit = 24): Promise<Im
         thumbnailUrl: thumbnail?.protocol === "https:" ? thumbnail.href : imageUrl.href,
         title: image.title ?? "",
         source: image.source ?? image.domain ?? imageUrl.hostname,
+        link: parseHttpUrl(image.link)?.href ?? null,
       },
     ];
   });

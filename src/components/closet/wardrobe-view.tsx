@@ -93,7 +93,7 @@ function HangingRail({ items, onEdit, onDelete }: RowProps) {
                   className="object-contain object-top drop-shadow-[0_8px_10px_rgba(0,0,0,0.25)] transition-transform duration-300 group-hover:rotate-1"
                 />
               </div>
-              <ItemLabel name={item.name} />
+              <ItemLabel name={item.name} wornCount={item.wear.count} />
               <ItemQuickActions
                 item={item}
                 onEdit={onEdit}
@@ -146,7 +146,7 @@ function Shelf({ items, compact, onEdit, onDelete }: RowProps & { compact?: bool
         <ul className="flex gap-3 px-3 pt-1" aria-hidden>
           {items.map((item) => (
             <li key={item.id} className={cn("shrink-0", compact ? "w-24" : "w-28 sm:w-32")}>
-              <ItemLabel name={item.name} />
+              <ItemLabel name={item.name} wornCount={item.wear.count} />
             </li>
           ))}
         </ul>
@@ -155,10 +155,11 @@ function Shelf({ items, compact, onEdit, onDelete }: RowProps & { compact?: bool
   );
 }
 
-function ItemLabel({ name }: { name: string }) {
+function ItemLabel({ name, wornCount }: { name: string; wornCount: number }) {
   return (
     <p className="mt-1 w-full truncate text-center text-[11px] text-muted-foreground" title={name}>
       {name}
+      {wornCount > 0 && <span className="tabular-nums"> · {wornCount}×</span>}
     </p>
   );
 }
