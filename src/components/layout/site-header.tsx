@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LogOut, Sparkles } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
-import { NavLinks } from "@/components/layout/nav-links";
+import { MobileTabBar, NavLinks } from "@/components/layout/nav-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getCurrentUserEmail } from "@/lib/auth";
@@ -11,19 +11,34 @@ import { AUTH_ENABLED } from "@/lib/auth-mode";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-1.5 font-semibold tracking-tight">
-          <Sparkles className="size-4" />
-          <span className="max-sm:sr-only">FitCheck AI</span>
-        </Link>
-        {/* Reads the session cookie, so it streams in after the static shell. */}
-        <Suspense fallback={null}>
-          <HeaderActions />
-        </Suspense>
-      </div>
-    </header>
+    <>
+      <header className="sticky top-0 z-40 border-b bg-background/80 pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 font-semibold tracking-tight pointer-coarse:min-h-12 pointer-coarse:min-w-12"
+          >
+            <Sparkles className="size-4" />
+            <span className="max-sm:sr-only">FitCheck AI</span>
+          </Link>
+          {/* Reads the session cookie, so it streams in after the static shell. */}
+          <Suspense fallback={null}>
+            <HeaderActions />
+          </Suspense>
+        </div>
+      </header>
+      {/* Rendered outside <header>: its backdrop-filter would make it the containing block for
+          the fixed tab bar, pinning the bar to the header instead of the screen bottom. */}
+      <Suspense fallback={null}>
+        <MobileNav />
+      </Suspense>
+    </>
   );
+}
+
+async function MobileNav() {
+  if (!AUTH_ENABLED) return <MobileTabBar />;
+  return (await getCurrentUserEmail()) ? <MobileTabBar /> : null;
 }
 
 async function HeaderActions() {
@@ -31,11 +46,7 @@ async function HeaderActions() {
     return (
       <div className="flex items-center gap-1 sm:gap-3">
         <NavLinks />
-        <Badge
-          variant="outline"
-          className="max-sm:hidden"
-          title="Sign-in is turned off; everyone shares one closet."
-        >
+        <Badge variant="outline" title="Sign-in is turned off; everyone shares one closet.">
           Demo mode
         </Badge>
       </div>
@@ -55,8 +66,11 @@ async function HeaderActions() {
   return (
     <div className="flex items-center gap-1 sm:gap-3">
       <NavLinks />
-      <form action={signOut} className="flex items-center gap-2 border-l pl-1 sm:pl-3">
-        <span className="hidden max-w-40 truncate text-xs text-muted-foreground lg:inline" title={email}>
+      <form action={signOut} className="flex items-center gap-2 md:border-l md:pl-3">
+        <span
+          className="hidden max-w-40 truncate text-xs text-muted-foreground lg:inline"
+          title={email}
+        >
           {email}
         </span>
         <Button type="submit" variant="ghost" size="icon-sm" aria-label="Sign out" title="Sign out">

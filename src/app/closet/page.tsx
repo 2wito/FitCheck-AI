@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { ClothingGridSkeleton } from "@/components/closet/clothing-grid";
 import { ClosetView } from "@/components/closet/closet-view";
+import { QuickCapture } from "@/components/closet/quick-capture";
 import { TodaysLook } from "@/components/closet/todays-look";
 import { UploadDialog } from "@/components/closet/upload-dialog";
 import { requireUserId } from "@/lib/auth";
@@ -21,7 +22,10 @@ export default function ClosetPage() {
           <h1 className="text-2xl font-semibold tracking-tight">My Closet</h1>
           <p className="text-muted-foreground">Everything you own, ready to mix and match.</p>
         </div>
-        <UploadDialog />
+        <div className="flex flex-wrap items-center gap-2">
+          <QuickCapture />
+          <UploadDialog />
+        </div>
       </header>
 
       <Suspense fallback={<ClothingGridSkeleton />}>

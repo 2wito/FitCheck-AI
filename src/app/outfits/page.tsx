@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus, Shirt } from "lucide-react";
+import { Plus, Shirt, Shuffle } from "lucide-react";
 
 import { OutfitCard } from "@/components/outfits/outfit-card";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,16 @@ export default function OutfitsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">My Outfits</h1>
           <p className="text-muted-foreground">Looks you&apos;ve put together, ready to wear.</p>
         </div>
-        <Button nativeButton={false} render={<Link href="/outfits/builder" />}>
-          <Plus data-icon="inline-start" />
-          Create outfit
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" nativeButton={false} render={<Link href="/outfits/mix" />}>
+            <Shuffle data-icon="inline-start" />
+            Mix &amp; Match
+          </Button>
+          <Button nativeButton={false} render={<Link href="/outfits/builder" />}>
+            <Plus data-icon="inline-start" />
+            Create outfit
+          </Button>
+        </div>
       </header>
 
       <Suspense fallback={<OutfitsSkeleton />}>

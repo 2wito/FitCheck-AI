@@ -1,6 +1,6 @@
 // Browser-side image helpers.
 
-const MAX_DIMENSION = 1600;
+const MAX_DIMENSION = 1280;
 
 // Downscales large photos and bakes in EXIF rotation before upload. This keeps
 // Server Action payloads small and makes AI analysis faster and cheaper.
@@ -18,7 +18,11 @@ export async function prepareImage(file: File): Promise<File> {
 
   // WebP keeps transparency and compresses well; browsers that can't encode it return PNG.
   const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Image encoding failed"))), "image/webp", 0.9),
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Image encoding failed"))),
+      "image/webp",
+      0.85,
+    ),
   );
   const extension = blob.type === "image/webp" ? "webp" : "png";
   const baseName = file.name.replace(/\.[^.]+$/, "") || "item";

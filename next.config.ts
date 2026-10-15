@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    // AVIF is ~20% smaller than WebP for photos; browsers without it get WebP.
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",

@@ -47,7 +47,7 @@ export function ClosetView({ items }: { items: ClosetItem[] }) {
         <div
           role="group"
           aria-label="Filter closet"
-          className="-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+          className="-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 pb-1 max-sm:basis-full sm:mx-0 sm:px-0"
         >
           {QUICK_FILTERS.map((f) => (
             <button
@@ -56,7 +56,7 @@ export function ClosetView({ items }: { items: ClosetItem[] }) {
               onClick={() => setFilterId(f.id)}
               aria-pressed={filterId === f.id}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors",
+                "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors pointer-coarse:min-h-12 pointer-coarse:px-4",
                 filterId === f.id
                   ? "border-foreground bg-foreground text-background"
                   : "bg-background text-muted-foreground hover:border-foreground/40 hover:text-foreground",

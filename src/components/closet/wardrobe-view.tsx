@@ -98,7 +98,8 @@ function HangingRail({ items, onEdit, onDelete }: RowProps) {
                 item={item}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                className="absolute top-10 right-0 flex-col"
+                className="absolute top-10 right-0"
+                vertical
               />
             </li>
           ))}
@@ -136,7 +137,8 @@ function Shelf({ items, compact, onEdit, onDelete }: RowProps & { compact?: bool
                 item={item}
                 onEdit={onEdit}
                 onDelete={onDelete}
-                className="absolute -top-1 right-0 flex-col"
+                className="absolute -top-1 right-0"
+                vertical
               />
             </li>
           ))}

@@ -47,7 +47,7 @@ export function ClosetDrawer({
             onClick={() => setFilter(value)}
             aria-pressed={filter === value}
             className={cn(
-              "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+              "rounded-full border px-2.5 py-0.5 text-xs transition-colors pointer-coarse:min-h-12 pointer-coarse:px-3.5",
               filter === value
                 ? "border-foreground bg-foreground text-background"
                 : "text-muted-foreground hover:border-foreground/40 hover:text-foreground",
