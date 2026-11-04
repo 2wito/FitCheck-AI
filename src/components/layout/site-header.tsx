@@ -16,9 +16,9 @@ export function SiteHeader() {
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
           <Link
             href="/"
-            className="flex items-center gap-1.5 font-semibold tracking-tight pointer-coarse:min-h-12 pointer-coarse:min-w-12"
+            className="flex items-center gap-1.5 rounded-md font-heading text-lg font-bold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-12 pointer-coarse:min-w-12"
           >
-            <Sparkles className="size-4" />
+            <Sparkles className="size-4 text-primary" aria-hidden />
             <span className="max-sm:sr-only">FitCheck AI</span>
           </Link>
           {/* Reads the session cookie, so it streams in after the static shell. */}

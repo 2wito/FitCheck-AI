@@ -34,10 +34,10 @@ export function NavLinks() {
           href={href}
           aria-current={active === href ? "page" : undefined}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm transition-colors",
+            "rounded-md px-3 py-1.5 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
             active === href
-              ? "bg-muted font-medium text-foreground"
-              : "text-muted-foreground hover:text-foreground",
+              ? "bg-accent font-medium text-accent-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >
           {label}
@@ -63,8 +63,8 @@ export function MobileTabBar() {
               href={href}
               aria-current={active === href ? "page" : undefined}
               className={cn(
-                "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors",
-                active === href ? "font-medium text-foreground" : "text-muted-foreground",
+                "flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs transition-colors duration-200 outline-none focus-visible:bg-muted",
+                active === href ? "font-semibold text-primary" : "text-muted-foreground",
               )}
             >
               <Icon className={cn("size-5", active === href && "stroke-[2.5]")} aria-hidden />
