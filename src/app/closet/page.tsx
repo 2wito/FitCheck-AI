@@ -7,11 +7,12 @@ import { QuickCapture } from "@/components/closet/quick-capture";
 import { TodaysLook } from "@/components/closet/todays-look";
 import { UploadDialog } from "@/components/closet/upload-dialog";
 import { requireUserId } from "@/lib/auth";
+import { AUTH_ENABLED, DEV_USER } from "@/lib/auth-mode";
 import { dbDateToKey } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: "My Closet",
+  title: AUTH_ENABLED ? "My Closet" : DEV_USER.name,
 };
 
 export default function ClosetPage() {
@@ -19,7 +20,9 @@ export default function ClosetPage() {
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">My Closet</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {AUTH_ENABLED ? "My Closet" : DEV_USER.name}
+          </h1>
           <p className="text-muted-foreground">Everything you own, ready to mix and match.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -7,8 +7,9 @@
 
 export const AUTH_ENABLED = process.env.AUTH_ENABLED !== "false";
 
+// The shared demo closet (demo mode only), shown to visitors as "TWITOS CLOSET".
 export const DEV_USER = {
   id: "00000000-0000-4000-8000-000000000001",
   email: "dev@fitcheck.local",
-  name: "Dev User",
+  name: "TWITOS CLOSET",
 } as const;

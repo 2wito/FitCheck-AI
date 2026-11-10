@@ -90,7 +90,7 @@ export default function Home() {
             </p>
             <div className="flex flex-wrap gap-3">
               <Button size="lg" className="h-11 px-5 text-base" nativeButton={false} render={<Link href="/closet" />}>
-                Open the demo closet
+                Open TWITOS CLOSET
                 <ArrowRight data-icon="inline-end" />
               </Button>
               <Button
