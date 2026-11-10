@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic";
-
 // Hit daily by a Vercel Cron Job (see vercel.json) so the free-tier Supabase project
 // never sees 7 idle days and gets paused.
 export async function GET(request: Request) {
