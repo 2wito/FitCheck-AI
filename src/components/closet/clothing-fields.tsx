@@ -2,8 +2,8 @@
 
 import { Field, OptionSelect } from "@/components/shared/form-controls";
 import { Input } from "@/components/ui/input";
-import { Category, Season } from "@/generated/prisma/browser";
-import { CATEGORY_LABELS, SEASON_LABELS, STYLES, capitalize, type Style } from "@/lib/clothing";
+import { ItemType, Season } from "@/generated/prisma/browser";
+import { ITEM_TYPE_LABELS, SEASON_LABELS, STYLES, capitalize, type Style } from "@/lib/clothing";
 import type { ClothingItem, ClothingTags } from "@/types";
 
 // Editable item details. secondaryColor is a string here ("" = none) for the text input.
@@ -11,7 +11,7 @@ export type ClothingFormValues = Omit<ClothingTags, "secondaryColor"> & { second
 
 export const EMPTY_CLOTHING_FORM: ClothingFormValues = {
   name: "",
-  category: Category.TOPS,
+  type: ItemType.SHIRT,
   color: "",
   secondaryColor: "",
   season: Season.ALL_WEATHER,
@@ -19,11 +19,11 @@ export const EMPTY_CLOTHING_FORM: ClothingFormValues = {
 };
 
 export function toFormValues(
-  item: Pick<ClothingItem, "name" | "category" | "color" | "secondaryColor" | "season" | "style">,
+  item: Pick<ClothingItem, "name" | "type" | "color" | "secondaryColor" | "season" | "style">,
 ): ClothingFormValues {
   return {
     name: item.name,
-    category: item.category,
+    type: item.type,
     color: item.color ?? "",
     secondaryColor: item.secondaryColor ?? "",
     season: item.season,
@@ -38,7 +38,7 @@ export function toTags(values: ClothingFormValues): ClothingTags {
   return { ...values, secondaryColor: values.secondaryColor.trim() || null };
 }
 
-const categoryItems = Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label }));
+const typeItems = Object.entries(ITEM_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 const seasonItems = Object.entries(SEASON_LABELS).map(([value, label]) => ({ value, label }));
 const styleItems = STYLES.map((style) => ({ value: style, label: capitalize(style) }));
 
@@ -68,12 +68,12 @@ export function ClothingFields({
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Category">
+        <Field label="Type">
           <OptionSelect
-            label="Category"
-            items={categoryItems}
-            value={value.category}
-            onChange={(category) => onChange({ ...value, category: category as Category })}
+            label="Type"
+            items={typeItems}
+            value={value.type}
+            onChange={(type) => onChange({ ...value, type: type as ItemType })}
           />
         </Field>
         <Field label="Season">

@@ -12,6 +12,7 @@ import { MatchBadge } from "@/components/outfits/match-score";
 import { SaveOutfitDialog, type OutfitDetails } from "@/components/outfits/save-outfit-dialog";
 import { Button } from "@/components/ui/button";
 import { Category } from "@/generated/prisma/browser";
+import { itemImageUrl } from "@/lib/clothing";
 import { estimateMatch } from "@/lib/match-score";
 import { autoLayout } from "@/lib/outfit-layout";
 import { cn } from "@/lib/utils";
@@ -284,7 +285,7 @@ function SlotCarousel({
               <div className={cn("relative w-full", slot.imageHeight)}>
                 {item ? (
                   <Image
-                    src={item.bgRemovedUrl ?? item.imageUrl}
+                    src={itemImageUrl(item)}
                     alt={item.name}
                     fill
                     sizes="(min-width: 640px) 360px, 70vw"

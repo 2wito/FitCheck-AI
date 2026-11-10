@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 
 import { Category } from "@/generated/prisma/browser";
-import { CATEGORY_LABELS } from "@/lib/clothing";
+import { CATEGORY_LABELS, itemImageUrl } from "@/lib/clothing";
 import { cn } from "@/lib/utils";
 import type { ClothingItem } from "@/types";
 
@@ -94,7 +94,7 @@ export function ClosetDrawer({
                   )}
                 >
                   <Image
-                    src={item.bgRemovedUrl ?? item.imageUrl}
+                    src={itemImageUrl(item)}
                     alt=""
                     fill
                     sizes="100px"

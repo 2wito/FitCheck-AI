@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { itemImageUrl } from "@/lib/clothing";
 import { getBackdrop } from "@/lib/backdrops";
 import { itemBoxStyle } from "@/lib/outfit-layout";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,7 @@ export function OutfitPreview({
       {items.map((item) => (
         <div key={item.id} className="absolute" style={itemBoxStyle(item)}>
           <Image
-            src={item.clothingItem.bgRemovedUrl ?? item.clothingItem.imageUrl}
+            src={itemImageUrl(item.clothingItem)}
             alt={item.clothingItem.name}
             fill
             sizes="(min-width: 1024px) 15vw, 40vw"

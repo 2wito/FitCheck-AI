@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Category, Season } from "@/generated/prisma/browser";
+import { ItemType, Season } from "@/generated/prisma/browser";
 import { STYLES } from "@/lib/clothing";
 
 // One schema for both the AI vision output and the user's review form, so the model can
@@ -12,7 +12,11 @@ export const clothingTagsSchema = z.object({
     .min(1, "Name is required")
     .max(80)
     .describe('Short descriptive name, e.g. "Navy crewneck sweater"'),
-  category: z.enum(Category),
+  type: z
+    .enum(ItemType)
+    .describe(
+      "Garment type. HOODIE = hoodies and sweatshirts; JACKET = light jackets, blazers, denim/bomber jackets; COAT = long or heavy winter coats; JEANS = denim trousers; SHORTS = any shorts; PANTS = other long trousers, joggers, chinos; SHIRT = t-shirts, shirts, tanks, knit tops",
+    ),
   color: z
     .string()
     .trim()

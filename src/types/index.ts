@@ -10,7 +10,7 @@ import type {
 } from "@/generated/prisma/browser";
 import type { ClothingTags } from "@/lib/validations/clothing";
 
-export { Category, Season } from "@/generated/prisma/browser";
+export { Category, ItemType, Season } from "@/generated/prisma/browser";
 export type { User, ClothingItem, Outfit, OutfitItem, ClothingTags };
 
 // An Outfit with its canvas items and the clothing each one places.
@@ -70,7 +70,12 @@ export type WearStats = { count: number; lastWornAt: string | null };
 export type ClosetItem = ClothingItem & {
   _count: { outfitItems: number };
   wear: WearStats;
+  // Ids of the custom sections this item is in.
+  sectionIds: string[];
 };
+
+// A user-made closet section (e.g. "Elegant").
+export type ClosetSection = { id: string; name: string };
 
 // Current local weather (Open-Meteo), used for "Today's look" and the AI stylist.
 export type Weather = {

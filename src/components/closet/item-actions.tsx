@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createContext, useContext, useState, useTransition } from "react";
 import Link from "next/link";
-import { CalendarCheck, Ellipsis, Loader2, Palette, Tag, Trash2 } from "lucide-react";
+import { CalendarCheck, Crop, Ellipsis, Loader2, Palette, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { markItemsWorn, unmarkItemWorn } from "@/actions/wear";
@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { todayKey } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { ClosetItem } from "@/types";
+
+// Opens the photo editor for an item; provided by ClosetView.
+export const EditPhotoContext = createContext<((item: ClosetItem) => void) | null>(null);
 
 // Quick actions shown over a closet card on hover/focus (always visible on touch screens,
 // which have no hover).
@@ -31,6 +34,7 @@ export function ItemQuickActions({
   const [isLogging, startLogging] = useTransition();
   const [sheetOpen, setSheetOpen] = useState(false);
   const wornToday = item.wear.lastWornAt === todayKey();
+  const onEditPhoto = useContext(EditPhotoContext);
 
   function logWornToday() {
     const date = todayKey();
@@ -89,6 +93,19 @@ export function ItemQuickActions({
               <Tag data-icon="inline-start" />
               Edit tags
             </Button>
+            {onEditPhoto && (
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => {
+                  setSheetOpen(false);
+                  onEditPhoto(item);
+                }}
+              >
+                <Crop data-icon="inline-start" />
+                Edit photo
+              </Button>
+            )}
             <Button
               variant="outline"
               className="justify-start"
@@ -134,6 +151,15 @@ export function ItemQuickActions({
         >
           <Tag />
         </ActionButton>
+        {onEditPhoto && (
+          <ActionButton
+            label={`Edit photo of ${item.name}`}
+            tooltip="Edit photo"
+            onClick={() => onEditPhoto(item)}
+          >
+            <Crop />
+          </ActionButton>
+        )}
         <ActionButton
           label={
             wornToday ? `${item.name} is logged as worn today` : `Mark ${item.name} as worn today`

@@ -4,6 +4,7 @@ import Image from "next/image";
 
 import { ItemQuickActions } from "@/components/closet/item-actions";
 import { Category } from "@/generated/prisma/browser";
+import { itemImageUrl } from "@/lib/clothing";
 import { cn } from "@/lib/utils";
 import type { ClosetItem } from "@/types";
 
@@ -86,7 +87,7 @@ function HangingRail({ items, onEdit, onDelete }: RowProps) {
               <Hanger className="h-9 w-20 text-wood-dark" />
               <div className="relative -mt-1 h-40 w-full sm:h-44">
                 <Image
-                  src={item.bgRemovedUrl ?? item.imageUrl}
+                  src={itemImageUrl(item)}
                   alt={item.name}
                   fill
                   sizes="128px"
@@ -126,7 +127,7 @@ function Shelf({ items, compact, onEdit, onDelete }: RowProps & { compact?: bool
             >
               <div className={cn("relative w-full", compact ? "h-20" : "h-28")}>
                 <Image
-                  src={item.bgRemovedUrl ?? item.imageUrl}
+                  src={itemImageUrl(item)}
                   alt={item.name}
                   fill
                   sizes="128px"

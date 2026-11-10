@@ -26,12 +26,12 @@ const FEATURES = [
   {
     icon: ScanLine,
     title: "Background removal in the browser",
-    body: "Snap a photo and the item is cut out on your device with an ML model, then saved as a light WebP.",
+    body: "Snap a photo and the item is cut out on your device, then framed so every shirt, pair of jeans or shoe shows at the same size.",
   },
   {
     icon: Tags,
     title: "AI clothing tags",
-    body: "Gemini vision reads each item and fills in category, colors, season and style for you.",
+    body: "Gemini vision sorts each item into shirts, hoodies, jeans, coats and more, and fills in colors, season and style.",
   },
   {
     icon: Wand2,
@@ -50,8 +50,8 @@ const FEATURES = [
   },
   {
     icon: CalendarDays,
-    title: "Planner and wear tracking",
-    body: "Plan looks on a calendar, log what you wore, and see which pieces sit unused.",
+    title: "Your own sections",
+    body: "Group pieces your way, like Elegant or Gym, plan looks on a calendar and see what sits unused.",
   },
 ] as const;
 
@@ -162,8 +162,8 @@ export default function Home() {
 // A static mock of the app (no data fetch), so the landing page stays fully prerendered.
 function HeroPreview() {
   const items = [
-    { icon: Shirt, label: "Linen shirt", tag: "Top · Summer" },
-    { icon: Shirt, label: "Wide-leg jeans", tag: "Bottom · All season" },
+    { icon: Shirt, label: "Linen shirt", tag: "Shirt · Summer" },
+    { icon: Shirt, label: "Wide-leg jeans", tag: "Jeans · All season" },
     { icon: Shirt, label: "White sneakers", tag: "Shoes · Casual" },
   ];
 

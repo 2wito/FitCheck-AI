@@ -20,7 +20,7 @@ export default function ClosetPage() {
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight">
             {AUTH_ENABLED ? "My Closet" : DEV_USER.name}
           </h1>
           <p className="text-muted-foreground">Everything you own, ready to mix and match.</p>
@@ -43,18 +43,26 @@ export default function ClosetPage() {
 async function ClosetItems() {
   const userId = await requireUserId();
 
-  const [items, wearStats] = await Promise.all([
+  const [items, wearStats, sections] = await Promise.all([
     prisma.clothingItem.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
       // Outfit count is shown when deleting an item that saved outfits use.
-      include: { _count: { select: { outfitItems: true } } },
+      include: {
+        _count: { select: { outfitItems: true } },
+        sections: { select: { id: true } },
+      },
     }),
     prisma.outfitWear.groupBy({
       by: ["clothingItemId"],
       where: { userId },
       _count: { _all: true },
       _max: { wornAt: true },
+    }),
+    prisma.section.findMany({
+      where: { userId },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true },
     }),
   ]);
 
@@ -64,15 +72,16 @@ async function ClosetItems() {
       { count: s._count._all, lastWornAt: s._max.wornAt ? dbDateToKey(s._max.wornAt) : null },
     ]),
   );
-  const closet = items.map((item) => ({
+  const closet = items.map(({ sections: itemSections, ...item }) => ({
     ...item,
+    sectionIds: itemSections.map((s) => s.id),
     wear: statsById.get(item.id) ?? { count: 0, lastWornAt: null },
   }));
 
   return (
     <>
       {closet.length >= 2 && <TodaysLook closetItems={closet} />}
-      <ClosetView items={closet} />
+      <ClosetView items={closet} sections={sections} />
     </>
   );
 }

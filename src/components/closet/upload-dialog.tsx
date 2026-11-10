@@ -29,6 +29,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/clothing";
 import { preloadBackgroundRemoval, removeBackgroundInBrowser } from "@/lib/background-removal";
+import { frameCutout } from "@/lib/item-frame";
 import { dataUrlToFile, prepareImage } from "@/lib/image";
 import type { ClothingTags, ImageSearchResult } from "@/types";
 
@@ -172,7 +173,12 @@ export function UploadDialog() {
     startSaving(async () => {
       const formData = new FormData();
       formData.append("image", step.upload.file);
-      if (step.cutout) formData.append("cutout", step.cutout.file);
+      if (step.cutout) {
+        formData.append("cutout", step.cutout.file);
+        // Same size as every other item of this type; the editor can adjust it later.
+        const framed = await frameCutout(step.cutout.file, form.type).catch(() => null);
+        if (framed) formData.append("framed", framed);
+      }
       for (const [key, value] of Object.entries(form)) formData.append(key, value);
 
       const result = await addClothingItem(formData).catch(() => null);

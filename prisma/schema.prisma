@@ -18,6 +18,20 @@ enum Category {
   ACCESSORIES
 }
 
+// Fine-grained garment type shown in the closet. Each type maps to one broad Category
+// (src/lib/clothing.ts), which the outfit builder, stylist and canvas layout rely on.
+enum ItemType {
+  SHIRT
+  HOODIE
+  JACKET
+  PANTS
+  SHORTS
+  JEANS
+  COAT
+  SHOES
+  ACCESSORY
+}
+
 enum Season {
   SUMMER
   WINTER
@@ -40,6 +54,7 @@ model User {
   outfits       Outfit[]
   outfitPlans   OutfitPlan[]
   outfitWears   OutfitWear[]
+  sections      Section[]
 
   @@map("users")
 }
@@ -49,18 +64,23 @@ model ClothingItem {
   userId         String   @db.Uuid
   name           String
   category       Category
+  type           ItemType @default(SHIRT)
   color          String?
   secondaryColor String?
   season         Season   @default(ALL_WEATHER)
   style          String?
   imageUrl       String
   bgRemovedUrl   String?
+  // The cutout placed in its type's guide frame (fixed canvas), so every item of a type
+  // shows at the same size. Re-made from bgRemovedUrl by the photo editor.
+  framedUrl      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   outfitItems OutfitItem[]
   wears       OutfitWear[]
+  sections    Section[]
 
   @@index([userId, category])
   @@map("clothing_items")
@@ -145,4 +165,18 @@ model OutfitWear {
   @@index([userId, wornAt])
   @@index([outfitId])
   @@map("outfit_wears")
+}
+
+// A user-made closet section (e.g. "Elegant"). An item can be in any number of sections.
+model Section {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ClothingItem[]
+
+  @@unique([userId, name])
+  @@map("sections")
 }

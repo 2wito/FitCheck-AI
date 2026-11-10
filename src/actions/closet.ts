@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { analyzeClothing } from "@/lib/ai/vision";
+import { TYPE_CATEGORY } from "@/lib/clothing";
 import { getCurrentUserId, requireUser } from "@/lib/auth";
 import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { ImageSearchNotConfiguredError, searchProductImages } from "@/lib/image-search";
@@ -140,10 +141,18 @@ export async function addClothingItem(formData: FormData): Promise<ActionResult<
   ) {
     return { success: false, error: "Invalid background-removed image" };
   }
+  // The cutout placed in its type's guide frame (made in the browser); optional.
+  const framed = formData.get("framed");
+  if (
+    framed !== null &&
+    (!(framed instanceof File) || !["image/webp", "image/png"].includes(framed.type))
+  ) {
+    return { success: false, error: "Invalid framed image" };
+  }
 
   const parsed = clothingTagsSchema.safeParse({
     name: formData.get("name"),
-    category: formData.get("category"),
+    type: formData.get("type"),
     color: formData.get("color"),
     secondaryColor: formData.get("secondaryColor") || null,
     season: formData.get("season"),
@@ -157,24 +166,34 @@ export async function addClothingItem(formData: FormData): Promise<ActionResult<
   const originalPath = `${user.id}/${id}/original.${IMAGE_EXTENSIONS[original.type]}`;
   const cutoutPath =
     cutout instanceof File ? `${user.id}/${id}/cutout.${IMAGE_EXTENSIONS[cutout.type]}` : null;
+  const framedPath =
+    framed instanceof File
+      ? `${user.id}/${id}/framed-${Date.now()}.${IMAGE_EXTENSIONS[framed.type]}`
+      : null;
   const uploaded: string[] = [];
+  const upload = (path: string, file: File) =>
+    uploadImage(path, file, file.type).then((url) => {
+      uploaded.push(path);
+      return url;
+    });
 
   try {
-    const [imageUrl, bgRemovedUrl] = await Promise.all([
-      uploadImage(originalPath, original, original.type).then((url) => {
-        uploaded.push(originalPath);
-        return url;
-      }),
-      cutout instanceof File && cutoutPath
-        ? uploadImage(cutoutPath, cutout, cutout.type).then((url) => {
-            uploaded.push(cutoutPath);
-            return url;
-          })
-        : null,
+    const [imageUrl, bgRemovedUrl, framedUrl] = await Promise.all([
+      upload(originalPath, original),
+      cutout instanceof File && cutoutPath ? upload(cutoutPath, cutout) : null,
+      framed instanceof File && framedPath ? upload(framedPath, framed) : null,
     ]);
 
     const item = await prisma.clothingItem.create({
-      data: { id, userId: user.id, ...parsed.data, imageUrl, bgRemovedUrl },
+      data: {
+        id,
+        userId: user.id,
+        ...parsed.data,
+        category: TYPE_CATEGORY[parsed.data.type],
+        imageUrl,
+        bgRemovedUrl,
+        framedUrl,
+      },
     });
 
     revalidatePath("/closet");
@@ -205,7 +224,7 @@ export async function updateClothingItem(
   // Scoping by userId means another user's item id simply isn't found.
   const { count } = await prisma.clothingItem.updateMany({
     where: { id, userId },
-    data: parsed.data,
+    data: { ...parsed.data, category: TYPE_CATEGORY[parsed.data.type] },
   });
   if (count === 0) return { success: false, error: "Item not found" };
 
@@ -222,7 +241,7 @@ export async function deleteClothingItem(id: string): Promise<ActionResult> {
 
   const item = await prisma.clothingItem.findFirst({
     where: { id, userId },
-    select: { imageUrl: true, bgRemovedUrl: true },
+    select: { imageUrl: true, bgRemovedUrl: true, framedUrl: true },
   });
   if (!item) return { success: false, error: "Item not found" };
 
@@ -235,10 +254,53 @@ export async function deleteClothingItem(id: string): Promise<ActionResult> {
 
   // Storage cleanup is best-effort: the item is already gone from the closet.
   await removeImages(
-    [item.imageUrl, item.bgRemovedUrl].map(closetPathFromUrl).filter((p): p is string => !!p),
+    [item.imageUrl, item.bgRemovedUrl, item.framedUrl]
+      .map(closetPathFromUrl)
+      .filter((p): p is string => !!p),
   ).catch((error) => console.error("Failed to remove item images", error));
 
   revalidatePath("/closet");
   revalidatePath("/outfits");
   return { success: true, data: undefined };
+}
+
+// Saves a re-framed picture from the photo editor and drops the previous one. A new file
+// name each time keeps browser and CDN caches from showing the old framing.
+export async function updateItemFraming(
+  id: string,
+  formData: FormData,
+): Promise<ActionResult<ClothingItem>> {
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
+
+  const framed = formData.get("framed");
+  if (
+    !(framed instanceof File) ||
+    !["image/webp", "image/png"].includes(framed.type) ||
+    framed.size > 3_000_000
+  ) {
+    return { success: false, error: "Invalid framed image" };
+  }
+
+  const item = await prisma.clothingItem.findFirst({
+    where: { id, userId },
+    select: { framedUrl: true },
+  });
+  if (!item) return { success: false, error: "Item not found" };
+
+  const path = `${userId}/${id}/framed-${Date.now()}.${IMAGE_EXTENSIONS[framed.type]}`;
+  try {
+    const framedUrl = await uploadImage(path, framed, framed.type);
+    const updated = await prisma.clothingItem.update({ where: { id }, data: { framedUrl } });
+    const previous = closetPathFromUrl(item.framedUrl);
+    if (previous) await removeImages([previous]).catch(() => undefined);
+
+    revalidatePath("/closet");
+    revalidatePath("/outfits");
+    return { success: true, data: updated };
+  } catch (error) {
+    console.error("Failed to save framed image", error);
+    await removeImages([path]).catch(() => undefined);
+    return { success: false, error: "Couldn't save the photo. Please try again." };
+  }
 }

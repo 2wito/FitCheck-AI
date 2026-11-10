@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { findItemsToBuy, type ShoppingSuggestions } from "@/actions/shopping";
 import { Button } from "@/components/ui/button";
 import type { Category } from "@/generated/prisma/browser";
-import { CATEGORY_LABELS } from "@/lib/clothing";
+import { CATEGORY_LABELS, itemImageUrl } from "@/lib/clothing";
 import type { LookCompletion } from "@/lib/complete-look";
 import type { ClothingItem } from "@/types";
 
@@ -91,7 +91,7 @@ function SuggestionRow({
     <li className="flex items-center gap-3">
       <div className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-muted">
         <Image
-          src={item.bgRemovedUrl ?? item.imageUrl}
+          src={itemImageUrl(item)}
           alt=""
           fill
           sizes="44px"

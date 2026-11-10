@@ -13,7 +13,7 @@ import { OptionSelect } from "@/components/shared/form-controls";
 import { WeatherSummary } from "@/components/shared/weather-summary";
 import { Button } from "@/components/ui/button";
 import { useWeather } from "@/hooks/use-weather";
-import { OCCASIONS, capitalize, type Occasion } from "@/lib/clothing";
+import { OCCASIONS, capitalize, type Occasion, itemImageUrl } from "@/lib/clothing";
 import { todayKey } from "@/lib/dates";
 import type { ClosetItem, StylistSuggestion } from "@/types";
 
@@ -107,7 +107,7 @@ export function TodaysLook({ closetItems }: { closetItems: ClosetItem[] }) {
                 className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-background/70 ring-1 ring-foreground/10"
               >
                 <Image
-                  src={item.bgRemovedUrl ?? item.imageUrl}
+                  src={itemImageUrl(item)}
                   alt={item.name}
                   fill
                   sizes="80px"

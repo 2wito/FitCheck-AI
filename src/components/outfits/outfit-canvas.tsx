@@ -30,7 +30,7 @@ import { SaveOutfitDialog, type OutfitDetails } from "@/components/outfits/save-
 import { Button } from "@/components/ui/button";
 import { useHistoryState } from "@/hooks/use-history";
 import { DEFAULT_BACKDROP, getBackdrop, type BackdropId } from "@/lib/backdrops";
-import type { Occasion } from "@/lib/clothing";
+import { itemImageUrl, type Occasion } from "@/lib/clothing";
 import { completeTheLook } from "@/lib/complete-look";
 import {
   autoLayout,
@@ -361,7 +361,7 @@ export function OutfitCanvas({
                 backdrop: scene,
                 imageFor: (id) => {
                   const clothing = closetById.get(id)!;
-                  return clothing.bgRemovedUrl ?? clothing.imageUrl;
+                  return itemImageUrl(clothing);
                 },
               })
             }
@@ -636,7 +636,7 @@ function CanvasItemView({
       )}
     >
       <Image
-        src={clothing.bgRemovedUrl ?? clothing.imageUrl}
+        src={itemImageUrl(clothing)}
         alt=""
         fill
         sizes="(min-width: 1024px) 30vw, 60vw"

@@ -6,6 +6,7 @@ import { AlertCircle, Camera, Check, Loader2, RotateCcw, X } from "lucide-react"
 import { addClothingItem, analyzeClothingImage } from "@/actions/closet";
 import { Button } from "@/components/ui/button";
 import { preloadBackgroundRemoval, removeBackgroundInBrowser } from "@/lib/background-removal";
+import { frameCutout } from "@/lib/item-frame";
 import { prepareImage } from "@/lib/image";
 import { cn } from "@/lib/utils";
 import type { ClothingTags } from "@/types";
@@ -31,7 +32,7 @@ const STEPS: Record<Exclude<Status, "done" | "error">, { step: number; label: st
 // Used when AI tagging fails: the item is still saved, and the user is told to edit it.
 const FALLBACK_TAGS: ClothingTags = {
   name: "Untagged item",
-  category: "TOPS",
+  type: "SHIRT",
   color: "unknown",
   secondaryColor: null,
   season: "ALL_WEATHER",
@@ -93,7 +94,11 @@ export function QuickCapture() {
     const tags = aiTags ?? FALLBACK_TAGS;
     const saveForm = new FormData();
     saveForm.append("image", image);
-    if (cutout) saveForm.append("cutout", cutout);
+    if (cutout) {
+      saveForm.append("cutout", cutout);
+      const framed = await frameCutout(cutout, tags.type).catch(() => null);
+      if (framed) saveForm.append("framed", framed);
+    }
     for (const [key, value] of Object.entries({
       ...tags,
       secondaryColor: tags.secondaryColor ?? "",
