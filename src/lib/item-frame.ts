@@ -37,25 +37,30 @@ export function guideFor(type: ItemType): Rect {
   };
 }
 
-export async function loadImage(source: Blob): Promise<HTMLImageElement> {
+// keepUrl: leave image.src (an object URL) valid so it can also be shown in an <img>;
+// the caller then revokes it with URL.revokeObjectURL when done.
+export async function loadImage(source: Blob, keepUrl = false): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(source);
+  const image = new Image();
+  image.src = url;
   try {
-    const image = new Image();
-    image.src = url;
     await image.decode();
-    return image;
-  } finally {
-    // decode() has finished, so the pixels stay available after revoking.
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
   }
+  // Once decoded, drawing to a canvas still works after revoking.
+  if (!keepUrl) URL.revokeObjectURL(url);
+  return image;
 }
 
 // Downloads a stored picture as a Blob (Supabase Storage allows cross-origin reads), so
-// drawing it never taints the canvas.
+// drawing it never taints the canvas. Its object URL stays valid for display: revoke
+// image.src when done.
 export async function fetchImage(url: string): Promise<HTMLImageElement> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Couldn't load image (${response.status})`);
-  return loadImage(await response.blob());
+  return loadImage(await response.blob(), true);
 }
 
 // Bounding box of the visible (non-transparent) pixels, in image pixels. Measured on a

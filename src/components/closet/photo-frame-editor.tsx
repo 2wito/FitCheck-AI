@@ -52,9 +52,11 @@ export function PhotoFrameEditor({
   useEffect(() => {
     if (!source || !type) return;
     let cancelled = false;
+    let loadedUrl: string | null = null;
     fetchImage(source)
       .then((loaded) => {
-        if (cancelled) return;
+        loadedUrl = loaded.src;
+        if (cancelled) return URL.revokeObjectURL(loaded.src);
         setImage(loaded);
         setPlacement(autoPlacement(loaded, type));
       })
@@ -64,6 +66,7 @@ export function PhotoFrameEditor({
       });
     return () => {
       cancelled = true;
+      if (loadedUrl) URL.revokeObjectURL(loadedUrl);
     };
   }, [source, type]);
 
