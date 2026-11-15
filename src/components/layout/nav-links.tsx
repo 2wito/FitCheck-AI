@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Info, LayoutGrid, Mars, Palette, Shirt, Shuffle, Venus } from "lucide-react";
+import { CalendarDays, Info, LayoutGrid, Palette, Shirt, Shuffle } from "lucide-react";
 
+import { CLOSET_THEME } from "@/components/shared/closet-icons";
 import { DEMO_CLOSETS, type DemoClosetKey } from "@/lib/auth-mode";
 import { cn } from "@/lib/utils";
 
@@ -65,8 +66,6 @@ export function NavLinks({ activeCloset }: { activeCloset?: DemoClosetKey }) {
   );
 }
 
-const CLOSET_ICONS = { male: Mars, female: Venus } as const;
-
 // Switches between the shared demo closets. Plain links (full page load) to the route that
 // sets the closet cookie, so every page re-renders with the newly selected closet's data.
 function ClosetSwitcher({ active }: { active: DemoClosetKey }) {
@@ -78,7 +77,7 @@ function ClosetSwitcher({ active }: { active: DemoClosetKey }) {
     >
       {(Object.keys(DEMO_CLOSETS) as DemoClosetKey[]).map((key) => {
         const { name, gender } = DEMO_CLOSETS[key];
-        const Icon = CLOSET_ICONS[gender];
+        const theme = CLOSET_THEME[gender];
         const selected = key === active;
         return (
           <a
@@ -89,17 +88,11 @@ function ClosetSwitcher({ active }: { active: DemoClosetKey }) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-10",
               selected
-                ? "bg-primary text-primary-foreground"
+                ? theme.selected
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            <Icon
-              className={cn(
-                "size-4",
-                !selected && (gender === "male" ? "text-sky-600" : "text-pink-600"),
-              )}
-              aria-hidden
-            />
+            <theme.Icon className={cn("size-4", !selected && theme.icon)} />
             <span className="max-xl:sr-only">{name}</span>
           </a>
         );

@@ -4,17 +4,16 @@ import {
   CalendarDays,
   CloudSun,
   Code2,
-  Mars,
   Palette,
   ScanLine,
   Shirt,
   Shuffle,
   Sparkles,
   Tags,
-  Venus,
   Wand2,
 } from "lucide-react";
 
+import { CLOSET_THEME, ManIcon, WomanIcon } from "@/components/shared/closet-icons";
 import { Button } from "@/components/ui/button";
 import { DEMO_CLOSETS } from "@/lib/auth-mode";
 
@@ -91,13 +90,13 @@ export function LandingPage() {
               {/* Plain links (full page load): the switch route sets the closet cookie, then
                   opens /closet, so no page is served from the client cache of the other closet. */}
               {/* eslint-disable @next/next/no-html-link-for-pages */}
-              <Button size="lg" className="h-11 px-5 text-base" nativeButton={false} render={<a href="/closets/twito" />}>
-                <Mars data-icon="inline-start" />
+              <Button size="lg" className={`h-11 px-5 text-base ${CLOSET_THEME.male.button}`} nativeButton={false} render={<a href="/closets/twito" />}>
+                <ManIcon data-icon="inline-start" />
                 Open {DEMO_CLOSETS.twito.name}
                 <ArrowRight data-icon="inline-end" />
               </Button>
-              <Button size="lg" className="h-11 px-5 text-base" nativeButton={false} render={<a href="/closets/shaked" />}>
-                <Venus data-icon="inline-start" />
+              <Button size="lg" className={`h-11 px-5 text-base ${CLOSET_THEME.female.button}`} nativeButton={false} render={<a href="/closets/shaked" />}>
+                <WomanIcon data-icon="inline-start" />
                 Open {DEMO_CLOSETS.shaked.name}
                 <ArrowRight data-icon="inline-end" />
               </Button>
