@@ -6,13 +6,13 @@ import { ClosetView } from "@/components/closet/closet-view";
 import { QuickCapture } from "@/components/closet/quick-capture";
 import { TodaysLook } from "@/components/closet/todays-look";
 import { UploadDialog } from "@/components/closet/upload-dialog";
-import { requireUserId } from "@/lib/auth";
-import { AUTH_ENABLED, DEV_USER } from "@/lib/auth-mode";
+import { getActiveCloset, requireUserId } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { dbDateToKey } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
-  title: AUTH_ENABLED ? "My Closet" : DEV_USER.name,
+  title: AUTH_ENABLED ? "My Closet" : "Closet",
 };
 
 export default function ClosetPage() {
@@ -21,7 +21,14 @@ export default function ClosetPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            {AUTH_ENABLED ? "My Closet" : DEV_USER.name}
+            {AUTH_ENABLED ? (
+              "My Closet"
+            ) : (
+              // The selected demo closet comes from a cookie, so it streams in per request.
+              <Suspense fallback="Closet">
+                <ClosetName />
+              </Suspense>
+            )}
           </h1>
           <p className="text-muted-foreground">Everything you own, ready to mix and match.</p>
         </div>
@@ -37,6 +44,10 @@ export default function ClosetPage() {
       </Suspense>
     </main>
   );
+}
+
+async function ClosetName() {
+  return (await getActiveCloset()).name;
 }
 
 // Reads the session cookie, so it renders per request inside the Suspense boundary.

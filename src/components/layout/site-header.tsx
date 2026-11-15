@@ -4,10 +4,9 @@ import { LogOut, Sparkles } from "lucide-react";
 
 import { signOut } from "@/actions/auth";
 import { MobileTabBar, NavLinks } from "@/components/layout/nav-links";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getCurrentUserEmail } from "@/lib/auth";
-import { AUTH_ENABLED, DEV_USER } from "@/lib/auth-mode";
+import { getActiveClosetKey, getCurrentUserEmail } from "@/lib/auth";
+import { AUTH_ENABLED } from "@/lib/auth-mode";
 
 export function SiteHeader() {
   return (
@@ -45,10 +44,7 @@ async function HeaderActions() {
   if (!AUTH_ENABLED) {
     return (
       <div className="flex items-center gap-1 sm:gap-3">
-        <NavLinks />
-        <Badge variant="outline" title="Live demo: everyone shares this closet.">
-          {DEV_USER.name}
-        </Badge>
+        <NavLinks activeCloset={await getActiveClosetKey()} />
       </div>
     );
   }

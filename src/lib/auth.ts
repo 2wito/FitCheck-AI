@@ -1,23 +1,38 @@
 import "server-only";
 
 import type { User as AuthUser } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { connection } from "next/server";
 
-import { AUTH_ENABLED, DEV_USER } from "@/lib/auth-mode";
+import {
+  AUTH_ENABLED,
+  CLOSET_COOKIE,
+  DEFAULT_CLOSET,
+  DEMO_CLOSETS,
+  isDemoClosetKey,
+  type DemoClosetKey,
+} from "@/lib/auth-mode";
 import { LOGIN_PATH } from "@/lib/auth-routes";
 import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
+// Demo mode: the closet picked in the nav (cookie), defaulting to Twito's. Reading the
+// cookie also marks the render as per-request, so no closet is prerendered at build time.
+export async function getActiveClosetKey(): Promise<DemoClosetKey> {
+  const value = (await cookies()).get(CLOSET_COOKIE)?.value;
+  return isDemoClosetKey(value) ? value : DEFAULT_CLOSET;
+}
+
+export async function getActiveCloset() {
+  return DEMO_CLOSETS[await getActiveClosetKey()];
+}
+
 // Read-only check for rendering and reads: the signed-in user's id, verified from the
 // session JWT. Every query and action scopes its data to this id.
-// In demo mode (auth disabled) it's always the shared Dev User.
+// In demo mode (auth disabled) it's the selected shared demo closet.
 export async function getCurrentUserId(): Promise<string | null> {
   if (!AUTH_ENABLED) {
-    // No cookie read in demo mode, so mark the render as per-request explicitly; otherwise
-    // pages could be prerendered at build time with a stale closet.
-    await connection();
-    return DEV_USER.id;
+    return (await getActiveCloset()).id;
   }
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -34,7 +49,7 @@ export async function requireUserId(): Promise<string> {
 
 // Signed-in user's email for display (header), or null when signed out.
 export async function getCurrentUserEmail(): Promise<string | null> {
-  if (!AUTH_ENABLED) return DEV_USER.email;
+  if (!AUTH_ENABLED) return (await getActiveCloset()).email;
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   return (data?.claims.email as string | undefined) ?? null;
@@ -60,8 +75,8 @@ export async function syncUser(authUser: AuthUser) {
 // For mutations: the signed-in user's profile row (synced on demand as a safety net).
 export async function requireUser() {
   if (!AUTH_ENABLED) {
-    const { id, ...profile } = DEV_USER;
-    return prisma.user.upsert({ where: { id }, update: {}, create: { id, ...profile } });
+    const { id, email, name } = await getActiveCloset();
+    return prisma.user.upsert({ where: { id }, update: {}, create: { id, email, name } });
   }
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();

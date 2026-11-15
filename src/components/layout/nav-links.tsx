@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, LayoutGrid, Palette, Shirt, Shuffle } from "lucide-react";
+import { CalendarDays, Info, LayoutGrid, Mars, Palette, Shirt, Shuffle, Venus } from "lucide-react";
 
+import { DEMO_CLOSETS, type DemoClosetKey } from "@/lib/auth-mode";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -22,28 +23,88 @@ function useActiveHref() {
   )[0]?.href;
 }
 
-// Top navigation, from tablet width up. Phones use the bottom tab bar instead.
-export function NavLinks() {
+const linkClass = (active: boolean) =>
+  cn(
+    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-10",
+    active
+      ? "bg-accent font-medium text-accent-foreground"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+
+// Top navigation. The page links show from tablet width up (phones use the bottom tab bar);
+// the closet switcher (demo mode only) and About show on every screen size.
+export function NavLinks({ activeCloset }: { activeCloset?: DemoClosetKey }) {
   const active = useActiveHref();
+  const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-1 max-md:hidden" aria-label="Main">
-      {LINKS.map(({ href, label }) => (
-        <Link
-          key={href}
-          href={href}
-          aria-current={active === href ? "page" : undefined}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-            active === href
-              ? "bg-accent font-medium text-accent-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-          )}
-        >
-          {label}
-        </Link>
-      ))}
+    <nav className="flex items-center gap-1" aria-label="Main">
+      <div className="flex items-center gap-1 max-md:hidden">
+        {LINKS.map(({ href, label }) => (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active === href ? "page" : undefined}
+            className={linkClass(active === href)}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+      {activeCloset && <ClosetSwitcher active={activeCloset} />}
+      <Link
+        href="/about"
+        aria-current={pathname === "/about" ? "page" : undefined}
+        className={linkClass(pathname === "/about")}
+        title="About"
+      >
+        <Info className="size-4 md:hidden" aria-hidden />
+        <span className="max-md:sr-only">About</span>
+      </Link>
     </nav>
+  );
+}
+
+const CLOSET_ICONS = { male: Mars, female: Venus } as const;
+
+// Switches between the shared demo closets. Plain links (full page load) to the route that
+// sets the closet cookie, so every page re-renders with the newly selected closet's data.
+function ClosetSwitcher({ active }: { active: DemoClosetKey }) {
+  return (
+    <div
+      role="group"
+      aria-label="Choose closet"
+      className="flex items-center gap-0.5 rounded-lg border bg-background/60 p-0.5 md:ml-1"
+    >
+      {(Object.keys(DEMO_CLOSETS) as DemoClosetKey[]).map((key) => {
+        const { name, gender } = DEMO_CLOSETS[key];
+        const Icon = CLOSET_ICONS[gender];
+        const selected = key === active;
+        return (
+          <a
+            key={key}
+            href={`/closets/${key}`}
+            aria-current={selected ? "true" : undefined}
+            title={name}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-10",
+              selected
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            <Icon
+              className={cn(
+                "size-4",
+                !selected && (gender === "male" ? "text-sky-600" : "text-pink-600"),
+              )}
+              aria-hidden
+            />
+            <span className="max-xl:sr-only">{name}</span>
+          </a>
+        );
+      })}
+    </div>
   );
 }
 
