@@ -225,7 +225,7 @@ export function UploadDialog() {
               <ImageDropzone
                 onFile={handleFile}
                 title="Drop a photo here or click to browse"
-                hint="JPEG, PNG or WebP. One item per photo works best."
+                hint="Best: a clean picture of the garment alone from Google Images. Otherwise, photograph it alone on a white background. JPEG, PNG or WebP."
               />
             </TabsContent>
             <TabsContent value="search" keepMounted className="pt-2 data-hidden:hidden">

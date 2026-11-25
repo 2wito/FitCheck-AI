@@ -1,12 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { AUTH_ENABLED } from "@/lib/auth-mode";
-import { LOGIN_PATH, isProtectedPath, safeNextPath } from "@/lib/auth-routes";
+import { AUTH_ENABLED, CLOSET_COOKIE, isDemoClosetKey } from "@/lib/auth-mode";
+import { LOGIN_PATH, isAccountPath, isClosetPath, safeNextPath } from "@/lib/auth-routes";
 import { SupabaseConfigError, getSupabaseConfig } from "@/lib/supabase/config";
 
 // Runs before every page request: refreshes the Supabase session cookie, sends signed-out
-// visitors of protected pages to /login, and sends signed-in visitors away from /login.
+// visitors of protected pages to /login (example closets need no sign-in), and sends signed-in visitors away from /login.
 export async function proxy(request: NextRequest) {
   // Demo mode: every route is open and Supabase Auth isn't touched, so a missing or
   // invalid Supabase config can't take the whole site down.
@@ -58,7 +58,9 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(data?.claims);
   const { pathname, search } = request.nextUrl;
 
-  if (!signedIn && isProtectedPath(pathname)) {
+  const inExampleCloset = isDemoClosetKey(request.cookies.get(CLOSET_COOKIE)?.value);
+
+  if (!signedIn && (isAccountPath(pathname) || (isClosetPath(pathname) && !inExampleCloset))) {
     const url = request.nextUrl.clone();
     url.pathname = LOGIN_PATH;
     url.search = `?next=${encodeURIComponent(pathname + search)}`;

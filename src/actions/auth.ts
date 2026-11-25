@@ -1,26 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { syncUser } from "@/lib/auth";
-import { LOGIN_PATH, safeNextPath } from "@/lib/auth-routes";
+import { getSessionProfile, syncUser } from "@/lib/auth";
+import { CLOSET_COOKIE } from "@/lib/auth-mode";
+import { safeNextPath } from "@/lib/auth-routes";
 import { createClient } from "@/lib/supabase/server";
+import { emailSchema } from "@/lib/validations/closet-profile";
 
 // Shape returned to the auth form via useActionState. On success the actions redirect instead.
-export type AuthFormState = { error?: string; message?: string } | null;
+// Accounts are made by creating a closet (src/actions/closet-profile.ts).
+export type AuthFormState = { error?: string } | null;
 
 const signInSchema = z.object({
-  email: z.email("Enter a valid email address"),
+  email: emailSchema,
   password: z.string().min(1, "Enter your password"),
-});
-
-const signUpSchema = z.object({
-  email: z.email("Enter a valid email address"),
-  // Supabase's default minimum is 6; 8 is a safer floor. bcrypt ignores bytes past 72.
-  password: z.string().min(8, "Use at least 8 characters").max(72, "Use at most 72 characters"),
 });
 
 // The URL the browser is on, so email and OAuth links return to the same deployment.
@@ -38,7 +35,6 @@ function friendlyAuthError(message: string) {
   if (/email not confirmed/i.test(message)) {
     return "Please confirm your email first. Check your inbox for the link.";
   }
-  if (/already registered/i.test(message)) return "An account with this email already exists. Sign in instead.";
   if (/rate limit/i.test(message)) return "Too many attempts. Please wait a minute and try again.";
   return message;
 }
@@ -52,30 +48,10 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
   if (error) return { error: friendlyAuthError(error.message) };
 
   await syncUser(data.user);
+  // Open their own closet, even if an example closet was open before.
+  (await cookies()).delete(CLOSET_COOKIE);
   revalidatePath("/", "layout");
   redirect(safeNextPath(formData.get("next")?.toString()));
-}
-
-export async function signUp(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
-  const parsed = signUpSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const next = safeNextPath(formData.get("next")?.toString());
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    ...parsed.data,
-    options: { emailRedirectTo: await callbackUrl(next) },
-  });
-  if (error) return { error: friendlyAuthError(error.message) };
-
-  // No session means email confirmation is on: the user finishes via the emailed link.
-  if (!data.session || !data.user) {
-    return { message: "Check your email for a confirmation link to finish signing up." };
-  }
-
-  await syncUser(data.user);
-  revalidatePath("/", "layout");
-  redirect(next);
 }
 
 export async function signInWithGoogle(
@@ -93,8 +69,13 @@ export async function signInWithGoogle(
 }
 
 export async function signOut() {
+  // A closet without email and password can't be signed in to again, so signing out would
+  // lock its owner out for good. Settings explains how to add a login first.
+  const profile = await getSessionProfile();
+  if (profile && !profile.hasLogin) redirect("/settings");
+
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   revalidatePath("/", "layout");
-  redirect(LOGIN_PATH);
+  redirect("/");
 }

@@ -1,15 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Loader2, Sparkles, TriangleAlert, MailCheck } from "lucide-react";
+import { useActionState } from "react";
+import Link from "next/link";
+import { Loader2, Sparkles, TriangleAlert } from "lucide-react";
 
-import { signIn, signInWithGoogle, signUp, type AuthFormState } from "@/actions/auth";
+import { signIn, signInWithGoogle, type AuthFormState } from "@/actions/auth";
 import { Field } from "@/components/shared/form-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Mode = "sign-in" | "sign-up";
-
+// Signing in to a closet that has an email and password. New visitors create a closet instead.
 export function AuthForm({
   next,
   initialError,
@@ -19,33 +19,22 @@ export function AuthForm({
   initialError: string | null;
   googleEnabled: boolean;
 }) {
-  const [mode, setMode] = useState<Mode>("sign-in");
-  const [signInState, signInAction, signingIn] = useActionState<AuthFormState, FormData>(signIn, null);
-  const [signUpState, signUpAction, signingUp] = useActionState<AuthFormState, FormData>(signUp, null);
+  const [state, signInAction, signingIn] = useActionState<AuthFormState, FormData>(signIn, null);
   const [googleState, googleAction, redirectingToGoogle] = useActionState<AuthFormState, FormData>(
     signInWithGoogle,
     null,
   );
-
-  const isSignUp = mode === "sign-up";
-  const state = isSignUp ? signUpState : signInState;
-  const pending = signingIn || signingUp || redirectingToGoogle;
+  const pending = signingIn || redirectingToGoogle;
   const error = state?.error ?? googleState?.error ?? (state ? null : initialError);
 
   return (
-    <div className="flex w-full max-w-sm flex-col gap-6 rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+    <div className="flex w-full max-w-sm flex-col gap-6 rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
       <div className="flex flex-col items-center gap-2 text-center">
         <div className="flex size-10 items-center justify-center rounded-full bg-muted">
           <Sparkles className="size-5" />
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">
-          {isSignUp ? "Create your account" : "Welcome back"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {isSignUp
-            ? "Build your virtual closet and let AI style your outfits."
-            : "Sign in to your FitCheck AI closet."}
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight">Welcome back</h1>
+        <p className="text-sm text-muted-foreground">Sign in to your closet.</p>
       </div>
 
       {googleEnabled && (
@@ -69,54 +58,46 @@ export function AuthForm({
         </>
       )}
 
-      {state?.message ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg bg-muted/60 p-4 text-center text-sm">
-          <MailCheck className="size-5" />
-          <p>{state.message}</p>
-        </div>
-      ) : (
-        // Keyed by mode so switching tabs clears the fields.
-        <form key={mode} action={isSignUp ? signUpAction : signInAction} className="flex flex-col gap-4">
-          <input type="hidden" name="next" value={next} />
-          <Field label="Email" htmlFor="email">
-            <Input id="email" name="email" type="email" autoComplete="email" required disabled={pending} />
-          </Field>
-          <Field label="Password" htmlFor="password">
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={isSignUp ? "new-password" : "current-password"}
-              minLength={isSignUp ? 8 : undefined}
-              required
-              disabled={pending}
-            />
-          </Field>
+      <form action={signInAction} className="flex flex-col gap-4">
+        <input type="hidden" name="next" value={next} />
+        <Field label="Email" htmlFor="email">
+          <Input id="email" name="email" type="email" autoComplete="email" required disabled={pending} />
+        </Field>
+        <Field label="Password" htmlFor="password">
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            disabled={pending}
+          />
+        </Field>
 
-          {error && (
-            <p role="alert" className="flex items-start gap-1.5 text-sm text-destructive">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-              {error}
-            </p>
-          )}
+        {error && (
+          <p role="alert" className="flex items-start gap-1.5 text-sm text-destructive">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            {error}
+          </p>
+        )}
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {(signingIn || signingUp) && <Loader2 data-icon="inline-start" className="animate-spin" />}
-            {isSignUp ? "Create account" : "Sign in"}
-          </Button>
-        </form>
-      )}
+        <Button type="submit" className="w-full" disabled={pending}>
+          {signingIn && <Loader2 data-icon="inline-start" className="animate-spin" />}
+          Sign in
+        </Button>
+      </form>
 
-      <p className="text-center text-sm text-muted-foreground">
-        {isSignUp ? "Already have an account?" : "New to FitCheck AI?"}{" "}
-        <button
-          type="button"
-          onClick={() => setMode(isSignUp ? "sign-in" : "sign-up")}
-          className="font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          {isSignUp ? "Sign in" : "Create an account"}
-        </button>
-      </p>
+      <div className="flex flex-col gap-2 border-t pt-5 text-center text-sm text-muted-foreground">
+        <p>Don&apos;t have a closet yet?</p>
+        <Button variant="outline" nativeButton={false} render={<Link href="/create" />}>
+          Create your closet
+        </Button>
+        {/* Plain link: the route sets the closet cookie first. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a href="/closets/twito" className="underline-offset-4 hover:text-foreground hover:underline">
+          Or look around an example closet
+        </a>
+      </div>
     </div>
   );
 }

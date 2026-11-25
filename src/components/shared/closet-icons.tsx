@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
-// Restroom-sign style figures for the two demo closets. Filled with currentColor, so the
-// parent sets the color (blue for Twito's closet, pink for Shaked's).
+// Restroom-sign style figures for closets without a photo. Filled with currentColor, so the
+// parent sets the color (blue for men, pink for women).
 
 export function ManIcon(props: SVGProps<SVGSVGElement>) {
   return (

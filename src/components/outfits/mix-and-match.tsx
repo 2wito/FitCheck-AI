@@ -142,7 +142,7 @@ export function MixAndMatch({ closetItems }: { closetItems: ClothingItem[] }) {
       </div>
 
       {/* Sticky action bar: stays in thumb reach above the phone tab bar. */}
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 flex flex-col gap-2 rounded-2xl border bg-background/95 p-3 shadow-lg backdrop-blur md:bottom-4">
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 flex flex-col gap-2 rounded-2xl border bg-background/95 p-3 shadow-lg backdrop-blur lg:bottom-4">
         <div className="flex items-center justify-between gap-2">
           {match ? (
             <MatchBadge score={match.score} />

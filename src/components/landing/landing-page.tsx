@@ -13,9 +13,9 @@ import {
   Wand2,
 } from "lucide-react";
 
-import { CLOSET_THEME, ManIcon, WomanIcon } from "@/components/shared/closet-icons";
+import { CreateClosetButton } from "@/components/closets/create-closet-button";
+import { PhotoTips } from "@/components/shared/photo-tips";
 import { Button } from "@/components/ui/button";
-import { DEMO_CLOSETS } from "@/lib/auth-mode";
 
 const REPO_URL = "https://github.com/2wito/FitCheck-AI";
 
@@ -52,6 +52,21 @@ const FEATURES = [
   },
 ] as const;
 
+const STEPS = [
+  {
+    title: "Create your closet",
+    body: "Pick a name and choose public or private. A public closet doesn't even need an email.",
+  },
+  {
+    title: "Add your clothes",
+    body: "Upload one clean picture per item. The background is removed and AI fills in the details.",
+  },
+  {
+    title: "Get outfits",
+    body: "Ask the AI stylist, mix and match, or build looks on the canvas, then plan your week.",
+  },
+] as const;
+
 const STACK = [
   "Next.js 16",
   "React 19",
@@ -63,8 +78,8 @@ const STACK = [
   "Vercel",
 ];
 
-// The landing content, shown on the homepage and on /about.
-export function LandingPage() {
+// The landing content, shown on the homepage (with the closet gallery) and on /about.
+export function LandingPage({ gallery }: { gallery?: React.ReactNode }) {
   return (
     <main className="flex flex-1 flex-col">
       {/* Hero */}
@@ -77,7 +92,7 @@ export function LandingPage() {
           <div className="flex flex-col gap-6">
             <span className="inline-flex w-fit items-center gap-1.5 rounded-full border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
               <Sparkles className="size-3.5 text-primary" aria-hidden />
-              Live demo, no sign-up needed
+              Free, ready in a minute, no verification email
             </span>
             <h1 className="text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
               Your closet, <span className="text-primary">styled by AI.</span>
@@ -86,24 +101,20 @@ export function LandingPage() {
               FitCheck AI turns photos of your clothes into a digital wardrobe, then helps you
               build, plan and track outfits from what you already own.
             </p>
+            <CreateClosetButton />
             <div className="flex flex-wrap gap-3">
-              {/* Plain links (full page load): the switch route sets the closet cookie, then
-                  opens /closet, so no page is served from the client cache of the other closet. */}
-              {/* eslint-disable @next/next/no-html-link-for-pages */}
-              <Button size="lg" className={`h-11 px-5 text-base ${CLOSET_THEME.male.button}`} nativeButton={false} render={<a href="/closets/twito" />}>
-                <ManIcon data-icon="inline-start" />
-                Open {DEMO_CLOSETS.twito.name}
-                <ArrowRight data-icon="inline-end" />
-              </Button>
-              <Button size="lg" className={`h-11 px-5 text-base ${CLOSET_THEME.female.button}`} nativeButton={false} render={<a href="/closets/shaked" />}>
-                <WomanIcon data-icon="inline-start" />
-                Open {DEMO_CLOSETS.shaked.name}
-                <ArrowRight data-icon="inline-end" />
-              </Button>
-              {/* eslint-enable @next/next/no-html-link-for-pages */}
               <Button
                 size="lg"
                 variant="outline"
+                className="h-11 px-5 text-base"
+                nativeButton={false}
+                render={<Link href="/#closets" />}
+              >
+                See the closets
+              </Button>
+              <Button
+                size="lg"
+                variant="ghost"
                 className="h-11 px-5 text-base"
                 nativeButton={false}
                 render={<a href={REPO_URL} target="_blank" rel="noreferrer" />}
@@ -115,6 +126,34 @@ export function LandingPage() {
           </div>
 
           <HeroPreview />
+        </div>
+      </section>
+
+      {gallery}
+
+      {/* How it works */}
+      <section className="border-b bg-muted/50" aria-labelledby="how">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-16 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 id="how" className="text-3xl font-bold tracking-tight">
+              How it works
+            </h2>
+            <Link href="/guide" className="font-medium underline underline-offset-4">
+              Read the full guide
+            </Link>
+          </div>
+          <ol className="grid gap-6 md:grid-cols-3">
+            {STEPS.map(({ title, body }, i) => (
+              <li key={title} className="flex flex-col gap-2">
+                <span className="flex size-9 items-center justify-center rounded-full bg-primary font-heading font-bold text-primary-foreground">
+                  {i + 1}
+                </span>
+                <h3 className="text-lg font-semibold">{title}</h3>
+                <p className="leading-relaxed text-muted-foreground">{body}</p>
+              </li>
+            ))}
+          </ol>
+          <PhotoTips />
         </div>
       </section>
 
@@ -157,8 +196,8 @@ export function LandingPage() {
               ))}
             </ul>
           </div>
-          <Button size="lg" className="h-11 px-5 text-base" nativeButton={false} render={<Link href="/closet" />}>
-            Try it now
+          <Button size="lg" className="h-11 px-5 text-base" nativeButton={false} render={<Link href="/create" />}>
+            Create your closet
             <ArrowRight data-icon="inline-end" />
           </Button>
         </div>

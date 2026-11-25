@@ -3,13 +3,16 @@
 export const LOGIN_PATH = "/login";
 export const DEFAULT_AUTHED_PATH = "/closet";
 
-const PROTECTED_PREFIXES = ["/closet", "/outfits", "/planner"];
+// Need an open closet: an example closet or the signed-in user's own.
+const CLOSET_PREFIXES = ["/closet", "/outfits", "/planner"];
+// Need a signed-in user, whichever closet is open.
+const ACCOUNT_PREFIXES = ["/settings"];
 
-export function isProtectedPath(pathname: string) {
-  return PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-}
+const matches = (pathname: string, prefixes: string[]) =>
+  prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+
+export const isClosetPath = (pathname: string) => matches(pathname, CLOSET_PREFIXES);
+export const isAccountPath = (pathname: string) => matches(pathname, ACCOUNT_PREFIXES);
 
 // Only same-site relative paths are allowed as post-login destinations; anything else
 // (absolute URLs, protocol-relative "//evil.com", backslash tricks) falls back to the default.

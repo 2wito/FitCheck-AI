@@ -40,15 +40,38 @@ enum Season {
   ALL_WEATHER
 }
 
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
 // Profile row for a Supabase Auth user. `id` is the same UUID as auth.users.id,
 // so it is set on sign-up rather than generated here.
 model User {
   id        String   @id @db.Uuid
   email     String   @unique
+  // Display name and profile photo, shown next to the closet's name.
   name      String?
   avatarUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // The user's closet (one per user). It exists once closetName is set; slug is its address
+  // (/c/<slug>). Public closets are listed on the homepage and are view-only for visitors.
+  closetName String?
+  slug       String?    @unique
+  visibility Visibility @default(PRIVATE)
+  gender     Gender?
+  city       String?
+  age        Int?
+  // False for a public closet opened without email and password: only the browser that
+  // created it can edit it, until a login is added in settings.
+  hasLogin   Boolean    @default(true)
 
   clothingItems ClothingItem[]
   outfits       Outfit[]
@@ -56,7 +79,18 @@ model User {
   outfitWears   OutfitWear[]
   sections      Section[]
 
+  @@index([visibility, createdAt])
   @@map("users")
+}
+
+// How many times something limited was used on one day, e.g. key "ai:<userId>".
+model UsageCounter {
+  key   String
+  day   DateTime @db.Date
+  count Int      @default(0)
+
+  @@id([key, day])
+  @@map("usage_counters")
 }
 
 model ClothingItem {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { DoorOpen, LayoutGrid, ListChecks, Plus, Trash2 } from "lucide-react";
 
 import { EmptyState, MasonryGrid } from "@/components/closet/clothing-grid";
@@ -13,6 +14,7 @@ import {
   SectionItemsDialog,
 } from "@/components/closet/section-dialogs";
 import { WardrobeView } from "@/components/closet/wardrobe-view";
+import { PhotoTips } from "@/components/shared/photo-tips";
 import { Button } from "@/components/ui/button";
 import { ItemType } from "@/generated/prisma/browser";
 import { ITEM_TYPE_LABELS } from "@/lib/clothing";
@@ -76,10 +78,19 @@ export function ClosetView({
 
   if (items.length === 0) {
     return (
-      <EmptyState
-        title="Your closet is empty"
-        description='Add your first item with the "Add item" button to start building outfits.'
-      />
+      <div className="flex flex-col gap-4">
+        <EmptyState
+          title="Your closet is ready. Add your first item!"
+          description='Press "Add item" above. Two items are enough to start getting outfits.'
+        />
+        <PhotoTips />
+        <p className="text-center text-sm text-muted-foreground">
+          New here?{" "}
+          <Link href="/guide" className="font-medium text-foreground underline underline-offset-4">
+            Read the quick guide
+          </Link>
+        </p>
+      </div>
     );
   }
 

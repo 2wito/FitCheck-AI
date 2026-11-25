@@ -174,7 +174,7 @@ export function QuickCapture() {
         <ul
           aria-live="polite"
           aria-label="Photos being added"
-          className="fixed right-20 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-30 flex flex-col gap-2 md:right-6 md:bottom-6 md:left-auto md:w-80"
+          className="fixed right-20 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-4 z-30 flex flex-col gap-2 md:right-6 md:left-auto md:w-80 lg:bottom-6"
         >
           {jobs.map((job) => (
             <JobRow

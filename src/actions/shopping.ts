@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Category } from "@/generated/prisma/browser";
 import { getCurrentUserId } from "@/lib/auth";
 import { ImageSearchNotConfiguredError, searchProductImages } from "@/lib/image-search";
+import { SEARCH_LIMIT_MESSAGE, consumeUsage } from "@/lib/usage";
 import type { ActionResult, ImageSearchResult } from "@/types";
 
 const CATEGORY_NOUNS: Record<Category, string> = {
@@ -35,13 +36,17 @@ export async function findItemsToBuy(
 ): Promise<ActionResult<ShoppingSuggestions>> {
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Invalid request" };
-  if (!(await getCurrentUserId())) return { success: false, error: "You must be signed in" };
+  const userId = await getCurrentUserId();
+  if (!userId) return { success: false, error: "You must be signed in" };
 
   const { category, colors, style } = parsed.data;
   // Lead with the outfit's main color: e.g. "streetwear black shoes".
   const query = [style, colors.find(Boolean), CATEGORY_NOUNS[category]].filter(Boolean).join(" ");
 
   try {
+    if (!(await consumeUsage("search", userId))) {
+      return { success: false, error: SEARCH_LIMIT_MESSAGE };
+    }
     // "buy online" and excluding inspiration sites steers image results toward product pages
     // (phrasings like "...to match my outfit" mostly return Pinterest outfit posts).
     const found = await searchProductImages(

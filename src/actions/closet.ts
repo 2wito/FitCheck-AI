@@ -9,6 +9,7 @@ import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { ImageSearchNotConfiguredError, searchProductImages } from "@/lib/image-search";
 import { prisma } from "@/lib/prisma";
 import { fetchRemoteImage } from "@/lib/remote-image";
+import { SEARCH_LIMIT_MESSAGE, consumeUsage } from "@/lib/usage";
 import { closetPathFromUrl, removeImages, uploadImage } from "@/lib/storage";
 import { SupabaseConfigError } from "@/lib/supabase/config";
 import { IMAGE_EXTENSIONS, readImageFile } from "@/lib/uploads";
@@ -36,10 +37,13 @@ const USER_UNAVAILABLE = AUTH_ENABLED
 // the server needs no native ML binaries. A tagging failure isn't fatal: the user fills in
 // the details (or quick capture saves the item as untagged).
 async function analyzeImage(
+  userId: string,
   bytes: Uint8Array<ArrayBuffer>,
   mediaType: string,
 ): Promise<ActionResult<ClothingAnalysis>> {
   try {
+    // Over the daily limit: same as a failed tagging, the user fills in the details.
+    if (!(await consumeUsage("ai", userId))) return { success: true, data: { tags: null } };
     return { success: true, data: { tags: await analyzeClothing(bytes, mediaType) } };
   } catch (error) {
     console.error("AI tagging failed", error);
@@ -52,25 +56,30 @@ async function analyzeImage(
 export async function analyzeClothingImage(
   formData: FormData,
 ): Promise<ActionResult<ClothingAnalysis>> {
-  if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
 
   const image = readImageFile(formData, "image");
   if (typeof image === "string") return { success: false, error: image };
 
-  return analyzeImage(new Uint8Array(await image.arrayBuffer()), image.type);
+  return analyzeImage(userId, new Uint8Array(await image.arrayBuffer()), image.type);
 }
 
 // Online search: finds product photos for a name/brand query.
 export async function searchClothingImages(
   query: string,
 ): Promise<ActionResult<ImageSearchResult[]>> {
-  if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
 
   const parsed = searchQuerySchema.safeParse(query);
   if (!parsed.success)
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid search" };
 
   try {
+    if (!(await consumeUsage("search", userId))) {
+      return { success: false, error: SEARCH_LIMIT_MESSAGE };
+    }
     return { success: true, data: await searchProductImages(parsed.data) };
   } catch (error) {
     if (error instanceof ImageSearchNotConfiguredError) {
@@ -86,7 +95,8 @@ export async function searchClothingImages(
 export async function analyzeClothingImageFromUrl(
   input: Pick<ImageSearchResult, "imageUrl" | "thumbnailUrl">,
 ): Promise<ActionResult<RemoteClothingAnalysis>> {
-  if (!(await getCurrentUserId())) return NOT_SIGNED_IN;
+  const userId = await getCurrentUserId();
+  if (!userId) return NOT_SIGNED_IN;
 
   const parsed = remoteImageSchema.safeParse(input);
   if (!parsed.success) return { success: false, error: "Invalid image link" };
@@ -108,7 +118,7 @@ export async function analyzeClothingImageFromUrl(
     return { success: false, error: "That image couldn't be downloaded. Try another result." };
   }
 
-  const analysis = await analyzeImage(new Uint8Array(image.data), image.mediaType);
+  const analysis = await analyzeImage(userId, new Uint8Array(image.data), image.mediaType);
   if (!analysis.success) return analysis;
 
   return {

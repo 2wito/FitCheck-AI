@@ -9,7 +9,7 @@ Built with Next.js 16 (App Router), TypeScript, Tailwind CSS, shadcn/ui (Base UI
 - **Virtual closet:** upload a photo, or search for a product online. Gemini tags the category, colors, season and style, and the background is removed automatically.
 - **Outfit canvas:** drag, resize and layer items, then save outfits with a name and occasion.
 - **AI stylist:** generates an outfit from your closet for an occasion and season.
-- **Accounts:** email/password sign-in (Google optional). All data is private to its owner.
+- **Closets for everyone:** anyone can create a closet. Public closets are listed on the homepage and are view-only for visitors; private ones need an email and password (no verification email). Two example closets are open for everyone to edit.
 - **Planner & wear tracking:** plan outfits on a calendar, log what you wear, and see "last worn" and wear counts on closet cards.
 - **Today's look:** a weather-aware outfit suggestion using local weather from Open-Meteo. The stylist skips pieces worn in the last 7 days.
 - **Complete the look:** suggestions from your closet for incomplete or low-scoring outfits, plus items to buy online (via Serper) for categories you don't own.
@@ -69,17 +69,16 @@ values ('closet', 'closet', true, 10485760, array['image/jpeg','image/png','imag
 npm run dev
 ```
 
-Open http://localhost:3000. You'll be asked to sign in or create an account (in demo mode you go straight to the closet).
+Open http://localhost:3000. Create a closet from the homepage, or open an example closet.
 
-## Demo mode (auth off)
+## Closets and sign-in
 
-Sign-in is on by default. Setting `AUTH_ENABLED="false"` runs the app without sign-in:
-
-- **Open routes:** every route is open, `/login` redirects to `/closet`, and the proxy never calls Supabase Auth.
-- **One shared account:** all data belongs to a single built-in "Dev User" (`src/lib/auth-mode.ts`).
-- **Auth code stays in place:** all Supabase Auth code (login page, callback, proxy checks) remains. Remove the variable (or set it to `"true"`) and redeploy to turn sign-in back on.
-
-**Don't launch publicly in demo mode.** Anyone with the URL can view and change the shared closet and use your Gemini and Serper quotas.
+- **One closet per user:** the closet's name, address (`/c/<slug>`), visibility and profile are fields on `User`.
+- **Session vs. open closet** (`src/lib/auth.ts`): the signed-in user owns their settings; clothes and outfits belong to the *open* closet, which is an example closet (cookie) or the user's own.
+- **Public closets without an email:** the account gets an internal address, and only the browser that created it can edit it until a login is added in Settings.
+- **Example closets:** defined in `src/lib/auth-mode.ts`, including their name and photo (put a file in `public/` and set `avatarUrl`). Everyone can edit their clothes.
+- **Daily limits** (`src/lib/usage.ts`): 40 AI calls and 20 searches per closet, 5 new closets per IP address.
+- **Demo mode:** `AUTH_ENABLED="false"` turns off sign-in and new closets, leaving only the example closets.
 
 ## Deploying to Vercel
 

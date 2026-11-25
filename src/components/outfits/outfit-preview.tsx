@@ -4,7 +4,12 @@ import { itemImageUrl } from "@/lib/clothing";
 import { getBackdrop } from "@/lib/backdrops";
 import { itemBoxStyle } from "@/lib/outfit-layout";
 import { cn } from "@/lib/utils";
-import type { OutfitWithItems } from "@/types";
+import type { CanvasTransform, ClothingItem } from "@/types";
+
+type PreviewItem = CanvasTransform & {
+  id: string;
+  clothingItem: Pick<ClothingItem, "name" | "imageUrl" | "bgRemovedUrl" | "framedUrl">;
+};
 
 // Read-only render of a saved outfit, using the same geometry as the editable canvas.
 export function OutfitPreview({
@@ -12,7 +17,7 @@ export function OutfitPreview({
   backdrop,
   className,
 }: {
-  items: OutfitWithItems["items"];
+  items: PreviewItem[];
   backdrop: string | null;
   className?: string;
 }) {

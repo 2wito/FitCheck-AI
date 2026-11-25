@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { syncUser } from "@/lib/auth";
+import { CLOSET_COOKIE } from "@/lib/auth-mode";
 import { LOGIN_PATH, safeNextPath } from "@/lib/auth-routes";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,7 +17,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error && data.user) {
       await syncUser(data.user);
-      return NextResponse.redirect(new URL(next, origin));
+      const response = NextResponse.redirect(new URL(next, origin));
+      response.cookies.delete(CLOSET_COOKIE);
+      return response;
     }
     console.error("Auth callback failed", error);
   }

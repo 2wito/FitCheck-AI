@@ -10,6 +10,7 @@ import { AUTH_ENABLED } from "@/lib/auth-mode";
 import { addDays, daysBetween, dbDateToKey, keyToDbDate, todayKey } from "@/lib/dates";
 import { estimateMatch } from "@/lib/match-score";
 import { prisma } from "@/lib/prisma";
+import { AI_LIMIT_MESSAGE, consumeUsage } from "@/lib/usage";
 import {
   generateOutfitSchema,
   saveOutfitSchema,
@@ -142,6 +143,7 @@ export async function generateOutfitWithAI(
     fresh.length >= 2 && categoriesOf(fresh) === categoriesOf(items) ? fresh : items;
 
   try {
+    if (!(await consumeUsage("ai", userId))) return { success: false, error: AI_LIMIT_MESSAGE };
     const suggestion = await generateOutfit({
       items: candidates,
       occasion: parsed.data.occasion,
@@ -186,6 +188,8 @@ export async function scoreOutfit(input: ScoreOutfitInput): Promise<ActionResult
   }
 
   try {
+    // Over the daily limit: the estimate below is used instead.
+    if (!(await consumeUsage("ai", userId))) throw new Error("daily AI limit reached");
     const result = await scoreOutfitWithAI(items, parsed.data.occasion);
     return { success: true, data: { ...result, source: "ai" } };
   } catch (error) {

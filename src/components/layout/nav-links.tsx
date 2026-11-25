@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Info, LayoutGrid, Palette, Shirt, Shuffle } from "lucide-react";
+import { CalendarDays, CircleHelp, LayoutGrid, Palette, Shirt, Shuffle } from "lucide-react";
 
+import { ClosetAvatar, genderKey } from "@/components/shared/closet-avatar";
 import { CLOSET_THEME } from "@/components/shared/closet-icons";
-import { DEMO_CLOSETS, type DemoClosetKey } from "@/lib/auth-mode";
+import { DEMO_CLOSETS, DEMO_CLOSET_KEYS, type DemoClosetKey } from "@/lib/auth-mode";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -32,68 +33,119 @@ const linkClass = (active: boolean) =>
       : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 
-// Top navigation. The page links show from tablet width up (phones use the bottom tab bar);
-// the closet switcher (demo mode only) and About show on every screen size.
-export function NavLinks({ activeCloset }: { activeCloset?: DemoClosetKey }) {
+export type OwnCloset = {
+  name: string;
+  avatarUrl: string | null;
+  gender: "MALE" | "FEMALE" | null;
+};
+
+// Top navigation. The closet pages' links show on wide screens (smaller ones use the bottom tab
+// bar) once a closet is open; the closet switcher and Guide show on every screen size.
+export function NavLinks({
+  exampleKey,
+  own,
+  hasClosetOpen,
+}: {
+  // The open example closet; null when it's the visitor's own (or none).
+  exampleKey: DemoClosetKey | null;
+  own: OwnCloset | null;
+  hasClosetOpen: boolean;
+}) {
   const active = useActiveHref();
   const pathname = usePathname();
 
   return (
     <nav className="flex items-center gap-1" aria-label="Main">
-      <div className="flex items-center gap-1 max-md:hidden">
-        {LINKS.map(({ href, label }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active === href ? "page" : undefined}
-            className={linkClass(active === href)}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
-      {activeCloset && <ClosetSwitcher active={activeCloset} />}
+      {hasClosetOpen && (
+        <div className="flex items-center gap-1 max-lg:hidden">
+          {LINKS.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active === href ? "page" : undefined}
+              className={linkClass(active === href)}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      )}
+      {hasClosetOpen && <ClosetSwitcher exampleKey={exampleKey} own={own} />}
+      <Link
+        href="/guide"
+        aria-current={pathname === "/guide" ? "page" : undefined}
+        className={cn(linkClass(pathname === "/guide"), "max-sm:px-2")}
+        title="Guide"
+      >
+        <CircleHelp className="size-4 md:hidden" aria-hidden />
+        <span className="max-md:sr-only">Guide</span>
+      </Link>
       <Link
         href="/about"
         aria-current={pathname === "/about" ? "page" : undefined}
-        className={linkClass(pathname === "/about")}
-        title="About"
+        className={cn(linkClass(pathname === "/about"), "max-xl:hidden")}
       >
-        <Info className="size-4 md:hidden" aria-hidden />
-        <span className="max-md:sr-only">About</span>
+        About
       </Link>
     </nav>
   );
 }
 
-// Switches between the shared demo closets. Plain links (full page load) to the route that
-// sets the closet cookie, so every page re-renders with the newly selected closet's data.
-function ClosetSwitcher({ active }: { active: DemoClosetKey }) {
+const switcherClass = (selected: boolean) =>
+  cn(
+    "flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-10",
+    !selected && "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+
+// Switches between the visitor's own closet and the example closets. Plain links (full page
+// load) to the route that sets the closet cookie, so every page re-renders with that closet.
+function ClosetSwitcher({
+  exampleKey,
+  own,
+}: {
+  exampleKey: DemoClosetKey | null;
+  own: OwnCloset | null;
+}) {
   return (
     <div
       role="group"
       aria-label="Choose closet"
-      className="flex items-center gap-0.5 rounded-lg border bg-background/60 p-0.5 md:ml-1"
+      className="flex items-center gap-0.5 rounded-lg border bg-background/60 p-0.5"
     >
-      {(Object.keys(DEMO_CLOSETS) as DemoClosetKey[]).map((key) => {
+      {own && (
+        // eslint-disable-next-line @next/next/no-html-link-for-pages
+        <a
+          href="/closets/mine"
+          aria-current={exampleKey === null ? "true" : undefined}
+          title={own.name}
+          className={cn(
+            switcherClass(exampleKey === null),
+            exampleKey === null && "bg-foreground text-background",
+          )}
+        >
+          <ClosetAvatar
+            src={own.avatarUrl}
+            name={own.name}
+            gender={genderKey(own.gender)}
+            className="size-5 text-[10px]"
+          />
+          <bdi className="max-w-28 truncate max-sm:sr-only">{own.name}</bdi>
+        </a>
+      )}
+      {DEMO_CLOSET_KEYS.map((key) => {
         const { name, gender } = DEMO_CLOSETS[key];
         const theme = CLOSET_THEME[gender];
-        const selected = key === active;
+        const selected = key === exampleKey;
         return (
           <a
             key={key}
             href={`/closets/${key}`}
             aria-current={selected ? "true" : undefined}
-            title={name}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-10",
-              selected
-                ? theme.selected
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
+            title={`${name} (example)`}
+            className={cn(switcherClass(selected), selected && theme.selected)}
           >
             <theme.Icon className={cn("size-4", !selected && theme.icon)} />
-            <span className="max-xl:sr-only">{name}</span>
+            <span className="sr-only">{name} (example)</span>
           </a>
         );
       })}
@@ -108,7 +160,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
     >
       <ul className="flex">
         {LINKS.map(({ href, label, short, icon: Icon }) => (
